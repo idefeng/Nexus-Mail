@@ -11,6 +11,7 @@ export interface EmailMessage {
     subject: string;
     from: string;
     date: Date;
+    seen: boolean;
     snippet: string;
     html?: string;
     text?: string;
@@ -27,10 +28,15 @@ export interface IAIAPI {
     setConfig: (config: { baseURL?: string; apiKey?: string; model?: string }) => Promise<void>;
 }
 
+export interface IConfigAPI {
+    getAccount: () => Promise<EmailConfig | null>;
+}
+
 declare global {
     interface Window {
         ipcRenderer: import('electron').IpcRenderer;
         emailAPI: IEmailAPI;
         aiAPI: IAIAPI;
+        configAPI: IConfigAPI;
     }
 }

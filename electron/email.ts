@@ -15,6 +15,7 @@ export interface EmailMessage {
     subject: string;
     from: string;
     date: Date;
+    seen: boolean;
     snippet: string;
     html?: string;
     text?: string;
@@ -105,6 +106,7 @@ export class EmailService {
                         subject: parsed.subject || '(无主题)',
                         from: parsed.from?.text || '未知',
                         date: parsed.date || new Date(),
+                        seen: msg.attributes.flags.includes('\\Seen'),
                         snippet: (parsed.text?.substring(0, 100) || '').replace(/\s+/g, ' '),
                         html: parsed.html || undefined,
                         text: parsed.text || undefined

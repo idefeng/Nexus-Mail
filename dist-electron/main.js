@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import imaps from "imap-simple";
 import { simpleParser } from "mailparser";
 import nodemailer from "nodemailer";
+import fs from "node:fs";
 var EmailService = class {
 	constructor() {
 		this.config = null;
@@ -70,6 +71,7 @@ var EmailService = class {
 						subject: parsed.subject || "(无主题)",
 						from: parsed.from?.text || "未知",
 						date: parsed.date || /* @__PURE__ */ new Date(),
+						seen: msg.attributes.flags.includes("\\Seen"),
 						snippet: (parsed.text?.substring(0, 100) || "").replace(/\s+/g, " "),
 						html: parsed.html || void 0,
 						text: parsed.text || void 0
@@ -186,6 +188,27 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 var win;
 var emailService = new EmailService();
 var aiService = new AIService();
+var CONFIG_PATH = path.join(app.getPath("userData"), "account_config.json");
+function getSavedAccount() {
+	try {
+		if (fs.existsSync(CONFIG_PATH)) {
+			const data = fs.readFileSync(CONFIG_PATH, "utf-8");
+			return JSON.parse(data);
+		}
+	} catch (e) {
+		console.error("Failed to load account config:", e);
+	}
+	return null;
+}
+function saveAccount(config) {
+	try {
+		fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+		return true;
+	} catch (e) {
+		console.error("Failed to save account config:", e);
+		return false;
+	}
+}
 function createWindow() {
 	win = new BrowserWindow({
 		icon: path.join(process.env.VITE_PUBLIC || "", "logo.png"),
@@ -213,11 +236,15 @@ app.whenReady().then(() => {
 		try {
 			const result = await emailService.connect(config);
 			console.log("[IPC] email:connect success");
+			if (result) saveAccount(config);
 			return result;
 		} catch (error) {
 			console.error("[IPC] email:connect error:", error);
 			throw error;
 		}
+	});
+	ipcMain.handle("config:getAccount", () => {
+		return getSavedAccount();
 	});
 	ipcMain.handle("email:fetch", async (_, limit) => {
 		console.log("[IPC] email:fetch requested, limit:", limit);

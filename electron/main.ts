@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { EmailService, type EmailConfig } from './email'
 import { AIService } from './ai'
+import fs from 'node:fs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -18,6 +19,30 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 let win: BrowserWindow | null
 const emailService = new EmailService()
 const aiService = new AIService()
+
+const CONFIG_PATH = path.join(app.getPath('userData'), 'account_config.json')
+
+function getSavedAccount() {
+    try {
+        if (fs.existsSync(CONFIG_PATH)) {
+            const data = fs.readFileSync(CONFIG_PATH, 'utf-8')
+            return JSON.parse(data)
+        }
+    } catch (e) {
+        console.error('Failed to load account config:', e)
+    }
+    return null
+}
+
+function saveAccount(config: EmailConfig) {
+    try {
+        fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2))
+        return true
+    } catch (e) {
+        console.error('Failed to save account config:', e)
+        return false
+    }
+}
 
 function createWindow() {
     win = new BrowserWindow({
@@ -58,11 +83,18 @@ app.whenReady().then(() => {
         try {
             const result = await emailService.connect(config);
             console.log('[IPC] email:connect success');
+            if (result) {
+                saveAccount(config);
+            }
             return result;
         } catch (error) {
             console.error('[IPC] email:connect error:', error);
             throw error;
         }
+    })
+
+    ipcMain.handle('config:getAccount', () => {
+        return getSavedAccount();
     })
 
     ipcMain.handle('email:fetch', async (_, limit: number) => {

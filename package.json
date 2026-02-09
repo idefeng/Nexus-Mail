@@ -10,7 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/fs-extra": "^11.0.4",
     "dompurify": "^3.3.1",
+    "fs-extra": "^11.3.3",
     "imap-simple": "^5.1.0",
     "lucide-vue-next": "^0.563.0",
     "mailparser": "^3.9.3",

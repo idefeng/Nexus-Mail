@@ -32,3 +32,7 @@ contextBridge.exposeInMainWorld('aiAPI', {
     summarize: (content: string) => ipcRenderer.invoke('ai:summarize', content),
     setConfig: (config: any) => ipcRenderer.invoke('ai:setConfig', config)
 })
+
+contextBridge.exposeInMainWorld('configAPI', {
+    getAccount: () => ipcRenderer.invoke('config:getAccount')
+})

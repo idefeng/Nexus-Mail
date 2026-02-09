@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { Inbox, Send, Sun, Moon, Search, Plus, RefreshCw, Reply, BrainCircuit, Sparkles, CheckCircle2, Settings } from 'lucide-vue-next'
 import DOMPurify from 'dompurify'
 import AccountModal from '../components/AccountModal.vue'
@@ -10,6 +10,7 @@ interface EmailMessage {
   subject: string
   from: string
   date: string
+  seen: boolean
   snippet: string
   html?: string
   text?: string
@@ -152,7 +153,17 @@ const sanitize = (content: string) => {
 const selectEmail = (email: EmailMessage) => {
     selectedEmail.value = email;
     isReplying.value = false;
+    // Mark as seen locally for immediate feedback
+    email.seen = true;
 }
+
+onMounted(async () => {
+  const savedAccount = await window.configAPI.getAccount()
+  if (savedAccount) {
+    console.log('[Main] Found saved account, auto-logging in...')
+    await handleLogin(savedAccount)
+  }
+})
 </script>
 
 <template>
@@ -232,11 +243,14 @@ const selectEmail = (email: EmailMessage) => {
             :class="selectedEmail?.id === email.id ? 'bg-blue-50 dark:bg-blue-900/20 shadow-inner' : 'hover:bg-white dark:hover:bg-zinc-800'"
          >
             <div class="flex justify-between items-start mb-1">
-              <span class="font-bold text-sm truncate w-2/3" :class="selectedEmail?.id === email.id ? 'text-blue-600' : ''" :title="email.from">{{ email.from }}</span>
+              <span class="text-sm truncate w-2/3 flex items-center gap-2" :class="[selectedEmail?.id === email.id ? 'text-blue-600 font-bold' : (email.seen ? 'text-zinc-600 font-medium' : 'text-zinc-900 dark:text-zinc-100 font-black')]" :title="email.from">
+                <span v-if="!email.seen" class="w-2 h-2 rounded-full bg-blue-600 shrink-0 shadow-[0_0_8px_rgba(37,99,235,0.4)]"></span>
+                {{ email.from }}
+              </span>
               <span class="text-[10px] text-zinc-400 font-medium uppercase shrink-0">{{ formatDate(email.date) }}</span>
             </div>
-            <h3 class="font-medium text-sm mb-1 truncate leading-tight">{{ email.subject }}</h3>
-            <p class="text-xs text-zinc-500 line-clamp-2 leading-normal">
+            <h3 class="text-sm mb-1 truncate leading-tight" :class="email.seen ? 'font-medium opacity-80' : 'font-bold opacity-100 text-zinc-900 dark:text-zinc-100'">{{ email.subject }}</h3>
+            <p class="text-xs line-clamp-2 leading-normal" :class="email.seen ? 'text-zinc-500 font-normal' : 'text-zinc-600 dark:text-zinc-300 font-medium'">
               {{ email.snippet }}
             </p>
          </div>

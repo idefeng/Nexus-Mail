@@ -20,3 +20,5 @@ AI 灵境助手：自动提取长邮件摘要，标记待办事项。
 数据库：SQLite / Lowdb (本地存储邮件索引和配置)。
 
 UI 组件库：Tailwind CSS + DaisyUI (极其适合通过 Vibe Coding 快速调整样式)。
+
+
