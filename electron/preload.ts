@@ -34,5 +34,6 @@ contextBridge.exposeInMainWorld('aiAPI', {
 })
 
 contextBridge.exposeInMainWorld('configAPI', {
-    getAccount: () => ipcRenderer.invoke('config:getAccount')
+    getAccount: () => ipcRenderer.invoke('config:getAccount'),
+    getAI: () => ipcRenderer.invoke('config:getAI')
 })

@@ -26,4 +26,7 @@ electron.contextBridge.exposeInMainWorld("aiAPI", {
 	summarize: (content) => electron.ipcRenderer.invoke("ai:summarize", content),
 	setConfig: (config) => electron.ipcRenderer.invoke("ai:setConfig", config)
 });
-electron.contextBridge.exposeInMainWorld("configAPI", { getAccount: () => electron.ipcRenderer.invoke("config:getAccount") });
+electron.contextBridge.exposeInMainWorld("configAPI", {
+	getAccount: () => electron.ipcRenderer.invoke("config:getAccount"),
+	getAI: () => electron.ipcRenderer.invoke("config:getAI")
+});

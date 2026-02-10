@@ -20,12 +20,13 @@ let win: BrowserWindow | null
 const emailService = new EmailService()
 const aiService = new AIService()
 
-const CONFIG_PATH = path.join(app.getPath('userData'), 'account_config.json')
+const ACCOUNT_CONFIG_PATH = path.join(app.getPath('userData'), 'account_config.json')
+const AI_CONFIG_PATH = path.join(app.getPath('userData'), 'ai_config.json')
 
 function getSavedAccount() {
     try {
-        if (fs.existsSync(CONFIG_PATH)) {
-            const data = fs.readFileSync(CONFIG_PATH, 'utf-8')
+        if (fs.existsSync(ACCOUNT_CONFIG_PATH)) {
+            const data = fs.readFileSync(ACCOUNT_CONFIG_PATH, 'utf-8')
             return JSON.parse(data)
         }
     } catch (e) {
@@ -36,10 +37,32 @@ function getSavedAccount() {
 
 function saveAccount(config: EmailConfig) {
     try {
-        fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2))
+        fs.writeFileSync(ACCOUNT_CONFIG_PATH, JSON.stringify(config, null, 2))
         return true
     } catch (e) {
         console.error('Failed to save account config:', e)
+        return false
+    }
+}
+
+function getSavedAIConfig() {
+    try {
+        if (fs.existsSync(AI_CONFIG_PATH)) {
+            const data = fs.readFileSync(AI_CONFIG_PATH, 'utf-8')
+            return JSON.parse(data)
+        }
+    } catch (e) {
+        console.error('Failed to load AI config:', e)
+    }
+    return null
+}
+
+function saveAIConfig(config: any) {
+    try {
+        fs.writeFileSync(AI_CONFIG_PATH, JSON.stringify(config, null, 2))
+        return true
+    } catch (e) {
+        console.error('Failed to save AI config:', e)
         return false
     }
 }
@@ -76,6 +99,13 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(() => {
+    // Load saved AI config on startup
+    const savedAI = getSavedAIConfig();
+    if (savedAI) {
+        console.log('[Main] Auto-loading AI configuration');
+        aiService.setConfig(savedAI);
+    }
+
     createWindow()
 
     ipcMain.handle('email:connect', async (_, config: EmailConfig) => {
@@ -95,6 +125,10 @@ app.whenReady().then(() => {
 
     ipcMain.handle('config:getAccount', () => {
         return getSavedAccount();
+    })
+
+    ipcMain.handle('config:getAI', () => {
+        return getSavedAIConfig();
     })
 
     ipcMain.handle('email:fetch', async (_, limit: number) => {
@@ -119,5 +153,6 @@ app.whenReady().then(() => {
 
     ipcMain.handle('ai:setConfig', async (_, config: any) => {
         aiService.setConfig(config)
+        saveAIConfig(config)
     })
 })

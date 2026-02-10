@@ -30,6 +30,7 @@ export interface IAIAPI {
 
 export interface IConfigAPI {
     getAccount: () => Promise<EmailConfig | null>;
+    getAI: () => Promise<any | null>;
 }
 
 declare global {

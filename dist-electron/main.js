@@ -185,11 +185,12 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 var win;
 var emailService = new EmailService();
 var aiService = new AIService();
-var CONFIG_PATH = path.join(app.getPath("userData"), "account_config.json");
+var ACCOUNT_CONFIG_PATH = path.join(app.getPath("userData"), "account_config.json");
+var AI_CONFIG_PATH = path.join(app.getPath("userData"), "ai_config.json");
 function getSavedAccount() {
 	try {
-		if (fs.existsSync(CONFIG_PATH)) {
-			const data = fs.readFileSync(CONFIG_PATH, "utf-8");
+		if (fs.existsSync(ACCOUNT_CONFIG_PATH)) {
+			const data = fs.readFileSync(ACCOUNT_CONFIG_PATH, "utf-8");
 			return JSON.parse(data);
 		}
 	} catch (e) {
@@ -199,10 +200,30 @@ function getSavedAccount() {
 }
 function saveAccount(config) {
 	try {
-		fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+		fs.writeFileSync(ACCOUNT_CONFIG_PATH, JSON.stringify(config, null, 2));
 		return true;
 	} catch (e) {
 		console.error("Failed to save account config:", e);
+		return false;
+	}
+}
+function getSavedAIConfig() {
+	try {
+		if (fs.existsSync(AI_CONFIG_PATH)) {
+			const data = fs.readFileSync(AI_CONFIG_PATH, "utf-8");
+			return JSON.parse(data);
+		}
+	} catch (e) {
+		console.error("Failed to load AI config:", e);
+	}
+	return null;
+}
+function saveAIConfig(config) {
+	try {
+		fs.writeFileSync(AI_CONFIG_PATH, JSON.stringify(config, null, 2));
+		return true;
+	} catch (e) {
+		console.error("Failed to save AI config:", e);
 		return false;
 	}
 }
@@ -227,6 +248,11 @@ app.on("activate", () => {
 	if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 app.whenReady().then(() => {
+	const savedAI = getSavedAIConfig();
+	if (savedAI) {
+		console.log("[Main] Auto-loading AI configuration");
+		aiService.setConfig(savedAI);
+	}
 	createWindow();
 	ipcMain.handle("email:connect", async (_, config) => {
 		console.log("[IPC] email:connect requested");
@@ -242,6 +268,9 @@ app.whenReady().then(() => {
 	});
 	ipcMain.handle("config:getAccount", () => {
 		return getSavedAccount();
+	});
+	ipcMain.handle("config:getAI", () => {
+		return getSavedAIConfig();
 	});
 	ipcMain.handle("email:fetch", async (_, limit) => {
 		console.log("[IPC] email:fetch requested, limit:", limit);
@@ -262,6 +291,7 @@ app.whenReady().then(() => {
 	});
 	ipcMain.handle("ai:setConfig", async (_, config) => {
 		aiService.setConfig(config);
+		saveAIConfig(config);
 	});
 });
 export { MAIN_DIST, RENDERER_DIST, VITE_DEV_SERVER_URL };

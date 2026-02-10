@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { Settings, Save, X } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -15,6 +15,15 @@ const form = ref({
   baseURL: 'https://api.deepseek.com/v1',
   apiKey: '',
   model: 'deepseek-chat'
+})
+
+watch(() => props.isOpen, async (newVal) => {
+  if (newVal) {
+    const saved = await window.configAPI.getAI()
+    if (saved) {
+      form.value = { ...saved }
+    }
+  }
 })
 
 const handleSave = () => {
