@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
-import { Inbox, Send, Sun, Moon, Search, Plus, RefreshCw, Reply, BrainCircuit, Sparkles, CheckCircle2, Settings } from 'lucide-vue-next'
+import { Inbox, Send, Sun, Moon, Search, Plus, RefreshCw, Reply, BrainCircuit, Sparkles, CheckCircle2, Settings, Paperclip } from 'lucide-vue-next'
 import DOMPurify from 'dompurify'
 import AccountModal from '../components/AccountModal.vue'
 import AISettingsModal from '../components/AISettingsModal.vue'
@@ -12,6 +12,7 @@ interface EmailMessage {
   date: string
   seen: boolean
   snippet: string
+  hasAttachments: boolean
   html?: string
   text?: string
 }
@@ -191,35 +192,32 @@ onMounted(async () => {
     />
 
     <!-- Sidebar -->
-    <aside class="w-16 flex flex-col items-center py-4 bg-zinc-100 dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 shrink-0">
-      <div class="mb-4">
-        <div class="w-10 h-10 rounded-full bg-transparent flex items-center justify-center cursor-pointer overflow-hidden border border-zinc-200 dark:border-zinc-800 transition-transform active:scale-95" @click="isAccountModalOpen = true" title="添加账户">
+    <aside class="w-20 flex flex-col items-center py-6 glass border-r border-zinc-200 dark:border-zinc-800/50 shrink-0 z-20">
+      <div class="mb-8 p-1">
+        <div class="w-12 h-12 rounded-2xl bg-white dark:bg-zinc-800 flex items-center justify-center cursor-pointer overflow-hidden border border-zinc-200 dark:border-zinc-700 shadow-sm transition-all hover:scale-105 active:scale-95" @click="isAccountModalOpen = true" title="添加账户">
           <img v-if="!emails.length" src="/logo.png" alt="NM" class="w-full h-full object-cover" />
           <span v-else class="text-white font-bold bg-blue-600 w-full h-full flex items-center justify-center">Me</span>
         </div>
       </div>
       
-      <nav class="flex-1 flex flex-col gap-4">
-        <button @click="isAccountModalOpen = true" class="w-10 h-10 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center transition-colors text-blue-600" title="添加账户">
-          <Plus class="w-5 h-5" />
-          <span class="sr-only">添加账户</span>
+      <nav class="flex-1 flex flex-col gap-6">
+        <button @click="isAccountModalOpen = true" class="w-12 h-12 rounded-2xl hover:bg-white/80 dark:hover:bg-zinc-800/80 flex flex-col items-center justify-center transition-all text-blue-600 group" title="添加账户">
+          <Plus class="w-6 h-6 transition-transform group-hover:rotate-90" />
         </button>
       
-        <button class="w-10 h-10 rounded-lg bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center transition-colors" title="收件箱">
-          <Inbox class="w-5 h-5" />
-          <span class="sr-only">收件箱</span>
+        <button class="w-12 h-12 rounded-2xl bg-blue-600 shadow-lg shadow-blue-500/20 flex flex-col items-center justify-center transition-all text-white" title="收件箱">
+          <Inbox class="w-6 h-6" />
         </button>
-        <button class="w-10 h-10 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center transition-colors" title="已发送">
-          <Send class="w-5 h-5" />
-          <span class="sr-only">已发送</span>
+        <button class="w-12 h-12 rounded-2xl hover:bg-white/80 dark:hover:bg-zinc-800/80 flex flex-col items-center justify-center transition-all text-zinc-500" title="已发送">
+          <Send class="w-6 h-6" />
         </button>
       </nav>
 
-      <div class="mt-auto flex flex-col items-center gap-2">
-        <button @click="isAISettingsOpen = true" class="w-10 h-10 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center transition-all text-zinc-400 hover:text-blue-500" title="AI 设置">
+      <div class="mt-auto flex flex-col items-center gap-4">
+        <button @click="isAISettingsOpen = true" class="w-10 h-10 rounded-xl hover:bg-white/80 dark:hover:bg-zinc-800/80 flex items-center justify-center transition-all text-zinc-400 hover:text-blue-500" title="AI 设置">
           <Settings class="w-5 h-5" />
         </button>
-        <button @click="toggleTheme" class="w-10 h-10 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 flex items-center justify-center transition-colors mb-2" :title="isDarkMode ? '切换到亮色模式' : '切换到暗色模式'">
+        <button @click="toggleTheme" class="w-10 h-10 rounded-xl hover:bg-white/80 dark:hover:bg-zinc-800/80 flex items-center justify-center transition-colors mb-2" :title="isDarkMode ? '切换到亮色模式' : '切换到暗色模式'">
           <Sun v-if="!isDarkMode" class="w-5 h-5" />
           <Moon v-else class="w-5 h-5" />
         </button>
@@ -227,40 +225,52 @@ onMounted(async () => {
     </aside>
 
     <!-- Mail List -->
-    <div class="w-80 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 shrink-0">
-      <div class="p-4 border-b border-zinc-200 dark:border-zinc-800">
-        <div class="flex justify-between items-center mb-2">
-           <h2 class="text-xl font-bold">收件箱</h2>
-           <button @click="fetchEmails" :class="{ 'animate-spin': isLoading }" class="p-1.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">
-             <RefreshCw class="w-4 h-4" />
+    <div class="w-96 flex flex-col bg-zinc-50/50 dark:bg-zinc-900/10 border-r border-zinc-200 dark:border-zinc-800/50 shrink-0 relative z-10">
+      <div class="p-6 pb-4">
+        <div class="flex justify-between items-center mb-4">
+           <h2 class="text-2xl font-bold tracking-tight">收件箱</h2>
+           <button @click="fetchEmails" :class="{ 'animate-spin': isLoading }" class="p-2 rounded-xl hover:bg-white dark:hover:bg-zinc-800 shadow-sm border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 transition-all">
+             <RefreshCw class="w-5 h-5 text-zinc-500" />
            </button>
         </div>
-        <div class="relative">
-           <Search class="absolute left-3 top-2.5 w-4 h-4 text-zinc-400" />
-           <input type="text" placeholder="搜索邮件..." class="w-full pl-9 pr-3 py-2 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" />
+        <div class="relative group">
+           <Search class="absolute left-3 top-2.5 w-4 h-4 text-zinc-400 transition-colors group-focus-within:text-blue-500" />
+           <input type="text" placeholder="搜索邮件..." class="w-full pl-10 pr-3 py-2.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm transition-all" />
         </div>
       </div>
-      <div class="flex-1 overflow-y-auto custom-scrollbar">
-         <div v-if="emails.length === 0" class="p-8 text-center text-zinc-500 text-sm">
+      <div class="flex-1 overflow-y-auto custom-scrollbar px-4 pb-4">
+         <div v-if="emails.length === 0" class="p-8 text-center text-zinc-500 text-sm italic">
             <span v-if="isLoading">正在加载邮件...</span>
-            <span v-else>暂无邮件，请添加账户或刷新</span>
+            <span v-else>暂无邮件</span>
          </div>
          <div 
             v-for="email in emails" 
             :key="email.id" 
             @click="selectEmail(email)"
-            class="p-4 border-b border-zinc-100 dark:border-zinc-800/50 cursor-pointer transition-all duration-200"
-            :class="selectedEmail?.id === email.id ? 'bg-blue-50 dark:bg-blue-900/20 shadow-inner' : 'hover:bg-white dark:hover:bg-zinc-800'"
+            class="mb-2 p-4 rounded-xl cursor-pointer transition-all duration-300 relative overflow-hidden group border border-transparent animate-slide-up"
+            :class="selectedEmail?.id === email.id ? 'bg-white dark:bg-zinc-800 shadow-md border-zinc-200 dark:border-zinc-700' : 'hover:bg-white/60 dark:hover:bg-zinc-800/40'"
          >
-            <div class="flex justify-between items-start mb-1">
-              <span class="text-sm truncate w-2/3 flex items-center gap-2" :class="[selectedEmail?.id === email.id ? 'text-blue-600 font-bold' : (email.seen ? 'text-zinc-600 font-medium' : 'text-zinc-900 dark:text-zinc-100 font-black')]" :title="email.from">
-                <span v-if="!email.seen" class="w-2 h-2 rounded-full bg-blue-600 shrink-0 shadow-[0_0_8px_rgba(37,99,235,0.4)]"></span>
+            <!-- Unread Marker (Blue Bar) -->
+            <div v-if="!email.seen" class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-3/5 bg-blue-600 rounded-r-full shadow-[0_0_8px_rgba(0,122,255,0.6)] z-10"></div>
+            
+            <!-- Line 1: From & Date -->
+            <div class="flex justify-between items-center mb-1 relative z-0">
+              <span class="text-sm font-bold truncate flex-1 pr-2" :class="email.seen ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'">
                 {{ email.from }}
               </span>
-              <span class="text-[10px] text-zinc-400 font-medium uppercase shrink-0">{{ formatDate(email.date) }}</span>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <Paperclip v-if="email.hasAttachments" class="w-3 h-3 text-zinc-400" />
+                <span class="text-[10px] text-zinc-400 font-medium tracking-tight">{{ formatDate(email.date) }}</span>
+              </div>
             </div>
-            <h3 class="text-sm mb-1 truncate leading-tight" :class="email.seen ? 'font-medium opacity-80' : 'font-bold opacity-100 text-zinc-900 dark:text-zinc-100'">{{ email.subject }}</h3>
-            <p class="text-xs line-clamp-2 leading-normal" :class="email.seen ? 'text-zinc-500 font-normal' : 'text-zinc-600 dark:text-zinc-300 font-medium'">
+
+            <!-- Line 2: Subject -->
+            <h3 class="text-sm mb-1 truncate leading-snug tracking-tight" :class="email.seen ? 'text-zinc-600 dark:text-zinc-400 font-medium' : 'text-zinc-900 dark:text-zinc-100 font-bold'">
+              {{ email.subject }}
+            </h3>
+
+            <!-- Line 3: Snippet -->
+            <p class="text-xs line-clamp-1 opacity-60 leading-relaxed font-medium" :class="email.seen ? 'text-zinc-400' : 'text-zinc-500 dark:text-zinc-400'">
               {{ email.snippet }}
             </p>
          </div>
@@ -268,7 +278,7 @@ onMounted(async () => {
     </div>
 
     <!-- Mail Content -->
-    <main class="flex-1 flex flex-col bg-white dark:bg-zinc-900 h-screen overflow-hidden">
+    <main class="flex-1 flex flex-col glass bg-white/60 dark:bg-zinc-900/40 h-screen overflow-hidden relative elevation-high z-20 shadow-2xl shadow-black/5 dark:shadow-black/40">
       <template v-if="selectedEmail">
         <header class="h-16 shrink-0 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-6 justify-between bg-zinc-50/50 dark:bg-zinc-950/20">
             <div class="flex items-center gap-3 overflow-hidden">
@@ -288,7 +298,8 @@ onMounted(async () => {
 
         <!-- Summary Section -->
         <div v-if="aiConfig.enabled" class="px-8 pt-6 pb-2 shrink-0">
-            <div class="bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+            <div class="bg-blue-500/5 dark:bg-blue-400/5 border border-blue-100/50 dark:border-blue-900/30 rounded-2xl p-6 shadow-sm overflow-hidden relative">
+                <div class="absolute top-0 right-0 p-8 bg-blue-500/10 blur-3xl -mr-8 -mt-8 rounded-full"></div>
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2 text-blue-600 dark:text-blue-400">
                         <BrainCircuit class="w-5 h-5" />

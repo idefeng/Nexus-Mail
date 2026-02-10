@@ -13,6 +13,7 @@ export interface EmailMessage {
     date: Date;
     seen: boolean;
     snippet: string;
+    hasAttachments: boolean;
     html?: string;
     text?: string;
 }

@@ -70,6 +70,7 @@ var EmailService = class {
 						date: parsed.date || /* @__PURE__ */ new Date(),
 						seen: msg.attributes.flags.includes("\\Seen"),
 						snippet: (parsed.text?.substring(0, 100) || "").replace(/\s+/g, " "),
+						hasAttachments: parsed.attachments && parsed.attachments.length > 0 || false,
 						html: parsed.html || void 0,
 						text: parsed.text || void 0
 					});

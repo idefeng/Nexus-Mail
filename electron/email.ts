@@ -17,6 +17,7 @@ export interface EmailMessage {
     date: Date;
     seen: boolean;
     snippet: string;
+    hasAttachments: boolean;
     html?: string;
     text?: string;
 }
@@ -106,6 +107,7 @@ export class EmailService {
                         date: parsed.date || new Date(),
                         seen: msg.attributes.flags.includes('\\Seen'),
                         snippet: (parsed.text?.substring(0, 100) || '').replace(/\s+/g, ' '),
+                        hasAttachments: (parsed.attachments && parsed.attachments.length > 0) || false,
                         html: parsed.html || undefined,
                         text: parsed.text || undefined
                     });
