@@ -140,6 +140,8 @@ const emails = ref<EmailMessage[]>([])
 const unreadCount = computed(() => emails.value.filter(e => !e.isRead).length)
 const selectedEmail = ref<EmailMessage | null>(null)
 const newFolderName = ref('')
+const accountAvatar = ref('')
+const currentAccountConfig = ref<any>(null)
 
 const showSyncError = computed(() => consecutiveFailures.value >= 3)
 
@@ -209,6 +211,7 @@ const handleLogin = async (config: any) => {
   try {
     const success = await window.emailAPI.connect(config)
     if (success) {
+      currentAccountConfig.value = config
       isAccountModalOpen.value = false
       // Reset state for new account
       emails.value = []
@@ -219,6 +222,10 @@ const handleLogin = async (config: any) => {
       window.emailAPI.getFolders()
         .then(f => folders.value = f)
         .catch(err => console.error('Initial folder fetch failed:', err))
+        
+      if (config.avatar) {
+        accountAvatar.value = config.avatar
+      }
     }
   } catch (error: any) {
     console.error('Login failed:', error)
@@ -421,6 +428,8 @@ onMounted(async () => {
   
   const savedAccount = await window.configAPI.getAccount()
   if (savedAccount) {
+    currentAccountConfig.value = savedAccount
+    if (savedAccount.avatar) accountAvatar.value = savedAccount.avatar
     console.log('[Main] Found saved account, auto-logging in...')
     await handleLogin(savedAccount)
   }
@@ -447,6 +456,7 @@ onUnmounted(() => {
     <AccountModal 
       :is-open="isAccountModalOpen" 
       :loading="isConnecting"
+      :initial-config="currentAccountConfig"
       @close="isAccountModalOpen = false" 
       @submit="handleLogin" 
     />
@@ -465,14 +475,15 @@ onUnmounted(() => {
     <!-- Sidebar -->
     <aside class="w-20 flex flex-col items-center py-6 glass border-r border-zinc-200 dark:border-zinc-800/50 shrink-0 z-20">
       <div class="mb-8 p-1">
-        <div class="w-12 h-12 rounded-2xl bg-white dark:bg-zinc-800 flex items-center justify-center cursor-pointer overflow-hidden border border-zinc-200 dark:border-zinc-700 shadow-sm transition-all hover:scale-105 active:scale-95" @click="isAccountModalOpen = true" title="账户设置">
-          <img v-if="!emails.length" src="/logo.png" alt="NM" class="w-full h-full object-cover" />
-          <span v-else class="text-white font-bold bg-blue-600 w-full h-full flex items-center justify-center">Me</span>
+        <div class="w-12 h-12 rounded-full bg-white dark:bg-zinc-800 flex items-center justify-center cursor-pointer overflow-hidden border border-zinc-200 dark:border-zinc-700 shadow-sm transition-all hover:scale-105 active:scale-95 ring-2 ring-transparent hover:ring-blue-500/30" @click="isAccountModalOpen = true" title="账户设置">
+          <img v-if="accountAvatar" :src="accountAvatar" alt="Avatar" class="w-full h-full object-cover" />
+          <img v-else-if="!emails.length" src="/logo.png" alt="NM" class="w-full h-full object-cover" />
+          <span v-else class="text-white font-bold bg-blue-600 w-full h-full flex items-center justify-center text-sm">Me</span>
         </div>
       </div>
       
       <nav class="flex-1 flex flex-col gap-6 relative">
-        <button @click="openCompose()" class="w-12 h-12 rounded-2xl bg-blue-600 shadow-lg shadow-blue-500/20 flex flex-col items-center justify-center transition-all text-white group hover:scale-110 active:scale-95" title="新建邮件">
+        <button @click="openCompose()" class="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-lg shadow-indigo-500/30 flex flex-col items-center justify-center transition-all text-white group hover:scale-110 active:scale-95 z-20" title="新建邮件">
           <Plus class="w-6 h-6 transition-transform group-hover:rotate-90" />
         </button>
       

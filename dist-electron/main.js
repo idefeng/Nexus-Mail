@@ -494,25 +494,18 @@ var contactService = new ContactService();
 var ACCOUNT_CONFIG_PATH = path.join(app.getPath("userData"), "account_config.json");
 var AI_CONFIG_PATH = path.join(app.getPath("userData"), "ai_config.json");
 function getSavedAccount() {
-	console.log("[Config] Loading account from:", ACCOUNT_CONFIG_PATH);
 	try {
-		if (fs.existsSync(ACCOUNT_CONFIG_PATH)) {
-			const data = fs.readFileSync(ACCOUNT_CONFIG_PATH, "utf-8");
-			console.log("[Config] Loaded account data success");
-			return JSON.parse(data);
-		} else console.log("[Config] No account config file found");
+		if (fs.existsSync(ACCOUNT_CONFIG_PATH)) return JSON.parse(fs.readFileSync(ACCOUNT_CONFIG_PATH, "utf-8"));
 	} catch (e) {
-		console.error("[Config] Failed to load account config:", e);
+		console.error("Failed to load account config:", e);
 	}
 	return null;
 }
 function saveAccountConfig(config) {
-	console.log("[Config] Saving account to:", ACCOUNT_CONFIG_PATH);
 	try {
 		fs.writeFileSync(ACCOUNT_CONFIG_PATH, JSON.stringify(config));
-		console.log("[Config] Account saved successfully");
 	} catch (e) {
-		console.error("[Config] Failed to save account config:", e);
+		console.error("Failed to save account config:", e);
 	}
 }
 function getSavedAI() {
@@ -536,8 +529,10 @@ function createWindow() {
 		height: 800,
 		icon: path.join(process.env.VITE_PUBLIC || "", "logo.png"),
 		webPreferences: { preload: path.join(__dirname, "preload.js") },
-		titleBarStyle: "hiddenInset"
+		titleBarStyle: "hiddenInset",
+		autoHideMenuBar: true
 	});
+	win.setMenu(null);
 	win.webContents.on("did-finish-load", () => {
 		win?.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
 	});

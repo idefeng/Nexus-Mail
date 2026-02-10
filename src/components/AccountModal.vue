@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { Camera, User } from 'lucide-vue-next'
 
 const props = defineProps<{
   isOpen: boolean
   loading: boolean
+  initialConfig?: any
 }>()
 
 const emit = defineEmits<{
@@ -16,7 +18,31 @@ const form = ref({
   pass: '',
   host: '',
   port: 993,
-  tls: true
+  tls: true,
+  avatar: ''
+})
+
+const fileInput = ref<HTMLInputElement | null>(null)
+
+const triggerFileInput = () => {
+  fileInput.value?.click()
+}
+
+const handleFileChange = (e: Event) => {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      form.value.avatar = e.target?.result as string
+    }
+    reader.readAsDataURL(file)
+  }
+}
+
+watch(() => props.isOpen, (newVal) => {
+  if (newVal && props.initialConfig) {
+    form.value = { ...form.value, ...props.initialConfig }
+  }
 })
 
 const handleSubmit = () => {
@@ -30,6 +56,26 @@ const handleSubmit = () => {
       <h2 class="text-xl font-bold mb-4">添加邮箱账户</h2>
       
       <form @submit.prevent="handleSubmit" class="space-y-4">
+        <!-- Avatar Upload -->
+        <div class="flex justify-center mb-6">
+          <div class="relative group cursor-pointer" @click="triggerFileInput">
+            <div class="w-20 h-20 rounded-full bg-zinc-100 dark:bg-zinc-800 border-2 border-dashed border-zinc-300 dark:border-zinc-700 flex items-center justify-center overflow-hidden hover:border-blue-500 transition-colors">
+              <img v-if="form.avatar" :src="form.avatar" class="w-full h-full object-cover" />
+              <User v-else class="w-8 h-8 text-zinc-400" />
+            </div>
+            <div class="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+              <Camera class="w-6 h-6 text-white" />
+            </div>
+            <input 
+              ref="fileInput"
+              type="file" 
+              accept="image/*" 
+              class="hidden" 
+              @change="handleFileChange"
+            />
+          </div>
+        </div>
+
         <div>
           <label class="block text-sm font-medium mb-1">邮箱地址</label>
           <input v-model="form.user" type="email" required class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-md focus:ring-2 focus:ring-blue-500 outline-none" placeholder="example@domain.com" />

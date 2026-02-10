@@ -73,8 +73,10 @@ function createWindow() {
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
         },
-        titleBarStyle: 'hiddenInset'
+        titleBarStyle: 'hiddenInset',
+        autoHideMenuBar: true
     })
+    win.setMenu(null)
 
     // Test active push Message to Renderer-process.
     win.webContents.on('did-finish-load', () => {
