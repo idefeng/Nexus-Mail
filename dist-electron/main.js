@@ -42,13 +42,13 @@ var EmailService = class {
 			throw error;
 		}
 	}
-	async fetchEmails(limit = 20) {
+	async fetchEmails(limit = 20, mailbox = "INBOX") {
 		if (!this.connection) throw new Error("Not connected");
-		console.log(`[IMAP] Fetching emails (Range Optimized), limit: ${limit}`);
+		console.log(`[IMAP] Fetching emails from ${mailbox}, limit: ${limit}`);
 		try {
-			console.log("[IMAP] Re-syncing INBOX...");
-			const totalMessages = (await this.connection.openBox("INBOX")).messages.total;
-			console.log(`[IMAP] Total messages in INBOX: ${totalMessages}`);
+			console.log(`[IMAP] Opening ${mailbox}...`);
+			const totalMessages = (await this.connection.openBox(mailbox)).messages.total;
+			console.log(`[IMAP] Total messages in ${mailbox}: ${totalMessages}`);
 			if (totalMessages === 0) return [];
 			const range = `${Math.max(1, totalMessages - limit + 1)}:${totalMessages}`;
 			console.log(`[IMAP] Fetching range: ${range}`);
@@ -56,14 +56,13 @@ var EmailService = class {
 				bodies: [""],
 				markSeen: false
 			});
-			console.log(`[IMAP] Fetch complete. Found ${messages.length} messages in range.`);
-			const results = [];
-			for (const msg of messages.reverse()) {
+			console.log(`[IMAP] Fetch complete. Found ${messages.length} messages. Parallel parsing...`);
+			const parsePromises = messages.reverse().map(async (msg) => {
 				const uid = msg.attributes.uid;
 				try {
 					const rawParams = msg.parts.find((p) => p.which === "")?.body;
 					const parsed = await simpleParser(rawParams);
-					results.push({
+					return {
 						id: uid + "",
 						subject: parsed.subject || "(无主题)",
 						from: parsed.from?.text || "未知",
@@ -74,16 +73,119 @@ var EmailService = class {
 						hasAttachments: parsed.attachments && parsed.attachments.length > 0 || false,
 						html: parsed.html || void 0,
 						text: parsed.text || void 0
-					});
+					};
 				} catch (msgErr) {
 					console.warn(`[IMAP] Failed to parse message UID ${uid}:`, msgErr);
+					return null;
 				}
-			}
+			});
+			const results = (await Promise.all(parsePromises)).filter((r) => r !== null);
+			console.log(`[IMAP] Parsing finished. Returning ${results.length} messages.`);
 			return results;
 		} catch (error) {
 			console.error("[IMAP] Range Fetch error:", error);
 			throw error;
 		}
+	}
+	async syncNewEmails(lastUid, mailbox = "INBOX") {
+		if (!this.connection) throw new Error("Not connected");
+		const uidNum = parseInt(lastUid);
+		if (isNaN(uidNum)) throw new Error("Invalid lastUid");
+		console.log(`[IMAP] Syncing new emails from ${mailbox} after UID ${uidNum}`);
+		try {
+			await this.connection.openBox(mailbox);
+			const searchCriteria = [["UID", `${uidNum + 1}:*`]];
+			const newMessages = (await this.connection.search(searchCriteria, {
+				bodies: [""],
+				markSeen: false
+			})).filter((m) => m.attributes.uid > uidNum);
+			if (newMessages.length === 0) {
+				console.log("[IMAP] No new emails found.");
+				return [];
+			}
+			console.log(`[IMAP] Found ${newMessages.length} new messages. Parsing...`);
+			const parsePromises = newMessages.reverse().map(async (msg) => {
+				const uid = msg.attributes.uid;
+				try {
+					const rawParams = msg.parts.find((p) => p.which === "")?.body;
+					const parsed = await simpleParser(rawParams);
+					return {
+						id: uid + "",
+						subject: parsed.subject || "(无主题)",
+						from: parsed.from?.text || "未知",
+						date: parsed.date || /* @__PURE__ */ new Date(),
+						isRead: msg.attributes.flags.includes("\\Seen"),
+						isStarred: msg.attributes.flags.includes("\\Flagged"),
+						snippet: (parsed.text?.substring(0, 100) || "").replace(/\s+/g, " "),
+						hasAttachments: parsed.attachments && parsed.attachments.length > 0 || false,
+						html: parsed.html || void 0,
+						text: parsed.text || void 0
+					};
+				} catch (msgErr) {
+					console.warn(`[IMAP] Failed to parse message UID ${uid}:`, msgErr);
+					return null;
+				}
+			});
+			return (await Promise.all(parsePromises)).filter((r) => r !== null);
+		} catch (error) {
+			console.error("[IMAP] Sync error:", error);
+			throw error;
+		}
+	}
+	async getFolders() {
+		if (!this.connection) throw new Error("Not connected");
+		console.log("[IMAP] getFolders requested");
+		const internalImap = this.connection.imap || this.connection.connection;
+		if (!internalImap) {
+			console.error("[IMAP] Could not find internal IMAP instance on connection object. Keys:", Object.keys(this.connection));
+			throw new Error("Internal IMAP instance not found");
+		}
+		return new Promise((resolve, reject) => {
+			internalImap.getBoxes((err, boxes) => {
+				if (err) {
+					console.error("[IMAP] getBoxes error:", err);
+					return reject(err);
+				}
+				const list = [];
+				const flatten = (obj, prefix = "") => {
+					for (const key in obj) {
+						const box = obj[key];
+						const fullPath = prefix + key;
+						if (!box.attribs || !box.attribs.includes("\\Noselect")) list.push(fullPath);
+						if (box.children) flatten(box.children, fullPath + box.delimiter);
+					}
+				};
+				flatten(boxes);
+				console.log(`[IMAP] Found ${list.length} folders`);
+				resolve(list);
+			});
+		});
+	}
+	async moveEmail(uid, targetFolder, sourceFolder = "INBOX") {
+		if (!this.connection) throw new Error("Not connected");
+		console.log(`[IMAP] Moving email UID ${uid} from ${sourceFolder} to ${targetFolder}`);
+		const internalImap = this.connection.imap || this.connection.connection;
+		if (!internalImap) throw new Error("Internal IMAP instance not found");
+		await this.connection.openBox(sourceFolder);
+		return new Promise((resolve, reject) => {
+			internalImap.move(uid, targetFolder, (err) => {
+				if (err) {
+					console.error("[IMAP] move error:", err);
+					return reject(err);
+				}
+				console.log(`[IMAP] Successfully moved UID ${uid}`);
+				resolve(true);
+			});
+		});
+	}
+	async createFolder(name) {
+		if (!this.connection) throw new Error("Not connected");
+		return new Promise((resolve, reject) => {
+			this.connection.imap.addBox(name, (err) => {
+				if (err) return reject(err);
+				resolve(true);
+			});
+		});
 	}
 	async sendEmail(to, subject, body) {
 		if (!this.config) throw new Error("Config missing");
@@ -274,10 +376,10 @@ app.whenReady().then(() => {
 	ipcMain.handle("config:getAI", () => {
 		return getSavedAIConfig();
 	});
-	ipcMain.handle("email:fetch", async (_, limit) => {
-		console.log("[IPC] email:fetch requested, limit:", limit);
+	ipcMain.handle("email:fetch", async (_, limit, mailbox) => {
+		console.log("[IPC] email:fetch requested, limit:", limit, "mailbox:", mailbox);
 		try {
-			const result = await emailService.fetchEmails(limit);
+			const result = await emailService.fetchEmails(limit, mailbox);
 			console.log("[IPC] email:fetch success, count:", result.length);
 			return result;
 		} catch (error) {
@@ -287,6 +389,15 @@ app.whenReady().then(() => {
 	});
 	ipcMain.handle("email:send", async (_, to, subject, body) => {
 		return await emailService.sendEmail(to, subject, body);
+	});
+	ipcMain.handle("email:getFolders", async () => {
+		return await emailService.getFolders();
+	});
+	ipcMain.handle("email:move", async (_, uid, targetFolder, sourceFolder) => {
+		return await emailService.moveEmail(uid, targetFolder, sourceFolder);
+	});
+	ipcMain.handle("email:createFolder", async (_, name) => {
+		return await emailService.createFolder(name);
 	});
 	ipcMain.handle("ai:summarize", async (_, content) => {
 		return await aiService.summarize(content);

@@ -21,8 +21,11 @@ export interface EmailMessage {
 
 export interface IEmailAPI {
     connect: (config: EmailConfig) => Promise<boolean>;
-    fetch: (limit?: number) => Promise<EmailMessage[]>;
+    fetch: (limit?: number, mailbox?: string) => Promise<EmailMessage[]>;
     send: (to: string, subject: string, body: string) => Promise<boolean>;
+    getFolders: () => Promise<string[]>;
+    move: (uid: string, targetFolder: string, sourceFolder?: string) => Promise<boolean>;
+    createFolder: (name: string) => Promise<boolean>;
 }
 
 export interface IAIAPI {

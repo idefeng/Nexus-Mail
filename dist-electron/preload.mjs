@@ -19,8 +19,11 @@ electron.contextBridge.exposeInMainWorld("ipcRenderer", {
 });
 electron.contextBridge.exposeInMainWorld("emailAPI", {
 	connect: (config) => electron.ipcRenderer.invoke("email:connect", config),
-	fetch: (limit) => electron.ipcRenderer.invoke("email:fetch", limit),
-	send: (to, subject, body) => electron.ipcRenderer.invoke("email:send", to, subject, body)
+	fetch: (limit, mailbox) => electron.ipcRenderer.invoke("email:fetch", limit, mailbox),
+	send: (to, subject, body) => electron.ipcRenderer.invoke("email:send", to, subject, body),
+	getFolders: () => electron.ipcRenderer.invoke("email:getFolders"),
+	move: (uid, targetFolder, sourceFolder) => electron.ipcRenderer.invoke("email:move", uid, targetFolder, sourceFolder),
+	createFolder: (name) => electron.ipcRenderer.invoke("email:createFolder", name)
 });
 electron.contextBridge.exposeInMainWorld("aiAPI", {
 	summarize: (content) => electron.ipcRenderer.invoke("ai:summarize", content),

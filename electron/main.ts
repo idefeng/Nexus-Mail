@@ -131,10 +131,10 @@ app.whenReady().then(() => {
         return getSavedAIConfig();
     })
 
-    ipcMain.handle('email:fetch', async (_, limit: number) => {
-        console.log('[IPC] email:fetch requested, limit:', limit);
+    ipcMain.handle('email:fetch', async (_, limit: number, mailbox?: string) => {
+        console.log('[IPC] email:fetch requested, limit:', limit, 'mailbox:', mailbox);
         try {
-            const result = await emailService.fetchEmails(limit);
+            const result = await emailService.fetchEmails(limit, mailbox);
             console.log('[IPC] email:fetch success, count:', result.length);
             return result;
         } catch (error) {
@@ -145,6 +145,18 @@ app.whenReady().then(() => {
 
     ipcMain.handle('email:send', async (_, to: string, subject: string, body: string) => {
         return await emailService.sendEmail(to, subject, body)
+    })
+
+    ipcMain.handle('email:getFolders', async () => {
+        return await emailService.getFolders()
+    })
+
+    ipcMain.handle('email:move', async (_, uid: string, targetFolder: string, sourceFolder?: string) => {
+        return await emailService.moveEmail(uid, targetFolder, sourceFolder)
+    })
+
+    ipcMain.handle('email:createFolder', async (_, name: string) => {
+        return await emailService.createFolder(name)
     })
 
     ipcMain.handle('ai:summarize', async (_, content: string) => {

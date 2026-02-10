@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Inbox, Send, Sun, Moon, Search, Plus, RefreshCw, Reply, BrainCircuit, Sparkles, CheckCircle2, Settings, Paperclip, CircleDashed, Star, FolderInput, Trash2 } from 'lucide-vue-next'
+import { Inbox, Send, Sun, Moon, Search, Plus, RefreshCw, Reply, BrainCircuit, Sparkles, CheckCircle2, Settings, Paperclip, CircleDashed, Star, FolderInput, Trash2, ChevronRight, Folder } from 'lucide-vue-next'
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import DOMPurify from 'dompurify'
 import AccountModal from '../components/AccountModal.vue'
@@ -8,12 +8,15 @@ import AISettingsModal from '../components/AISettingsModal.vue'
 // Context Menu State
 const contextMenu = ref({
   show: false,
+  showFolders: false,
   x: 0,
   y: 0,
   email: null as EmailMessage | null
 })
 
-const handleContextMenu = (e: MouseEvent, email: EmailMessage) => {
+const folders = ref<string[]>([])
+
+const handleContextMenu = async (e: MouseEvent, email: EmailMessage) => {
   e.preventDefault()
   const menuWidth = 208
   const menuHeight = 260
@@ -27,14 +30,25 @@ const handleContextMenu = (e: MouseEvent, email: EmailMessage) => {
   
   contextMenu.value = {
     show: true,
+    showFolders: false,
     x,
     y,
     email
+  }
+
+  // Load folders if not loaded
+  if (folders.value.length === 0) {
+    try {
+      folders.value = await (window as any).emailAPI.getFolders()
+    } catch (err) {
+      console.error('Failed to fetch folders:', err)
+    }
   }
 }
 
 const closeContextMenu = () => {
   contextMenu.value.show = false
+  contextMenu.value.showFolders = false
 }
 
 const handleKeyDown = (e: KeyboardEvent) => {
@@ -43,8 +57,6 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
 const toggleUnread = () => {
   if (contextMenu.value.email) {
-    // Force reactivity by re-setting the property if needed, 
-    // but Vue 3 ref should handle this.
     contextMenu.value.email.isRead = !contextMenu.value.email.isRead
   }
   closeContextMenu()
@@ -53,6 +65,23 @@ const toggleUnread = () => {
 const toggleStarred = () => {
   if (contextMenu.value.email) {
     contextMenu.value.email.isStarred = !contextMenu.value.email.isStarred
+  }
+  closeContextMenu()
+}
+
+const handleMoveEmail = async (folder: string) => {
+  if (contextMenu.value.email) {
+    try {
+      const emailToMove = contextMenu.value.email
+      await window.emailAPI.move(emailToMove.id, folder, currentMailbox.value)
+      // Remove from current list
+      emails.value = emails.value.filter(e => e.id !== emailToMove.id)
+      if (selectedEmail.value?.id === emailToMove.id) {
+        selectedEmail.value = null
+      }
+    } catch (err) {
+      console.error('Failed to move email:', err)
+    }
   }
   closeContextMenu()
 }
@@ -81,9 +110,43 @@ const isAccountModalOpen = ref(false)
 const isAISettingsOpen = ref(false)
 const isConnecting = ref(false)
 const isLoading = ref(false)
+const currentMailbox = ref('INBOX')
+const showFoldersSidebar = ref(false)
 const emails = ref<EmailMessage[]>([])
 const unreadCount = computed(() => emails.value.filter(e => !e.isRead).length)
 const selectedEmail = ref<EmailMessage | null>(null)
+const newFolderName = ref('')
+
+const isSentMailbox = computed(() => {
+  const name = currentMailbox.value.toLowerCase()
+  return name.includes('sent') || name.includes('已发送') || name.includes('发件箱')
+})
+
+const findAndSwitchSent = () => {
+  const sentFolder = folders.value.find(f => {
+    const low = f.toLowerCase()
+    return low.includes('sent') || low.includes('已发送') || low.includes('发件箱')
+  })
+  if (sentFolder) {
+    switchMailbox(sentFolder)
+  } else {
+    // Fallback if not found yet, try to switch to common names
+    switchMailbox('Sent Messages')
+  }
+}
+
+const createNewFolder = async () => {
+    if (!newFolderName.value) return
+    try {
+        await window.emailAPI.createFolder(newFolderName.value)
+        folders.value.push(newFolderName.value)
+        newFolderName.value = ''
+        // Optional: show some feedback
+    } catch (err) {
+        console.error('Failed to create folder:', err)
+        alert('创建文件夹失败')
+    }
+}
 
 // AI Logic
 const aiConfig = ref<any>({ enabled: true })
@@ -121,7 +184,15 @@ const handleLogin = async (config: any) => {
     const success = await window.emailAPI.connect(config)
     if (success) {
       isAccountModalOpen.value = false
-      await fetchEmails()
+      // Reset state for new account
+      emails.value = []
+      selectedEmail.value = null
+      
+      // Fetch in parallel but don't block login completion
+      fetchEmails().catch(err => console.error('Initial fetch failed:', err))
+      window.emailAPI.getFolders()
+        .then(f => folders.value = f)
+        .catch(err => console.error('Initial folder fetch failed:', err))
     }
   } catch (error: any) {
     console.error('Login failed:', error)
@@ -144,7 +215,7 @@ const handleAISave = async (config: any) => {
 const fetchEmails = async () => {
   isLoading.value = true
   try {
-    emails.value = await window.emailAPI.fetch(20)
+    emails.value = await window.emailAPI.fetch(20, currentMailbox.value)
     if (emails.value.length > 0 && !selectedEmail.value) {
       selectEmail(emails.value[0])
     }
@@ -153,6 +224,12 @@ const fetchEmails = async () => {
   } finally {
     isLoading.value = false
   }
+}
+
+const switchMailbox = async (mailbox: string) => {
+  currentMailbox.value = mailbox
+  selectedEmail.value = null
+  await fetchEmails()
 }
 
 const summarizeEmail = async (email: EmailMessage) => {
@@ -262,12 +339,17 @@ onUnmounted(() => {
         </div>
       </div>
       
-      <nav class="flex-1 flex flex-col gap-6">
+      <nav class="flex-1 flex flex-col gap-6 relative">
         <button @click="isAccountModalOpen = true" class="w-12 h-12 rounded-2xl hover:bg-white/80 dark:hover:bg-zinc-800/80 flex flex-col items-center justify-center transition-all text-blue-600 group" title="添加账户">
           <Plus class="w-6 h-6 transition-transform group-hover:rotate-90" />
         </button>
       
-        <button class="w-12 h-12 rounded-2xl bg-blue-600 shadow-lg shadow-blue-500/20 flex flex-col items-center justify-center transition-all text-white relative" title="收件箱">
+        <button 
+          @click="switchMailbox('INBOX')"
+          class="w-12 h-12 rounded-2xl flex flex-col items-center justify-center transition-all relative"
+          :class="currentMailbox === 'INBOX' ? 'bg-blue-600 shadow-lg shadow-blue-500/20 text-white' : 'hover:bg-white/80 dark:hover:bg-zinc-800/80 text-zinc-500'"
+          title="收件箱"
+        >
           <Inbox class="w-6 h-6" />
           <!-- Unread Badge -->
           <span v-if="unreadCount > 0" 
@@ -277,9 +359,69 @@ onUnmounted(() => {
             {{ unreadCount }}
           </span>
         </button>
-        <button class="w-12 h-12 rounded-2xl hover:bg-white/80 dark:hover:bg-zinc-800/80 flex flex-col items-center justify-center transition-all text-zinc-500" title="已发送">
+
+        <!-- Restore Sent Button -->
+        <button 
+          @click="findAndSwitchSent"
+          class="w-12 h-12 rounded-2xl flex flex-col items-center justify-center transition-all relative"
+          :class="isSentMailbox ? 'bg-blue-600 shadow-lg shadow-blue-500/20 text-white' : 'hover:bg-white/80 dark:hover:bg-zinc-800/80 text-zinc-500'"
+          title="已发送"
+        >
           <Send class="w-6 h-6" />
         </button>
+
+        <!-- Folder Switching Popover Trigger -->
+        <div class="relative">
+          <button 
+            @click="showFoldersSidebar = !showFoldersSidebar"
+            class="w-12 h-12 rounded-2xl flex flex-col items-center justify-center transition-all relative"
+            :class="folders.includes(currentMailbox) && currentMailbox !== 'INBOX' && !isSentMailbox ? 'bg-blue-600 shadow-lg shadow-blue-500/20 text-white' : 'hover:bg-white/80 dark:hover:bg-zinc-800/80 text-zinc-500'"
+            title="文件夹"
+          >
+            <Folder class="w-6 h-6" />
+          </button>
+
+          <!-- Sidebar Folder Popover -->
+          <Transition name="zoom">
+            <div 
+              v-if="showFoldersSidebar" 
+              class="absolute left-full top-0 ml-4 w-56 glass border border-zinc-200/50 dark:border-zinc-700/50 rounded-[20px] shadow-2xl p-[5px] z-50 origin-left"
+            >
+              <div class="px-3 py-2 text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex justify-between items-center text-zinc-400">
+                <span>我的文件夹</span>
+              </div>
+              
+              <div class="max-h-64 overflow-y-auto custom-scrollbar flex flex-col gap-[2px]">
+                <button 
+                  v-for="folder in folders" 
+                  :key="folder"
+                  @click="switchMailbox(folder); showFoldersSidebar = false"
+                  class="w-full h-9 px-3.5 flex items-center justify-between text-[13px] font-medium transition-all duration-200 rounded-[10px] group text-zinc-700 dark:text-zinc-300"
+                  :class="currentMailbox === folder ? 'bg-blue-600 text-white' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'"
+                >
+                  <span class="truncate">{{ folder }}</span>
+                  <div v-if="currentMailbox === folder" class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                </button>
+              </div>
+
+              <!-- Create Folder Action -->
+              <div class="h-px bg-zinc-200/50 dark:bg-zinc-700/50 mx-2 my-1"></div>
+              <div class="px-1 pb-1">
+                <div class="relative group">
+                  <input 
+                    type="text" 
+                    placeholder="新建文件夹..." 
+                    class="w-full h-8 pl-3 pr-8 bg-black/5 dark:bg-white/5 border-none rounded-lg text-[12px] focus:ring-1 focus:ring-blue-500/50 outline-none"
+                    @keyup.enter="createNewFolder"
+                    v-model="newFolderName"
+                  />
+                  <Plus @click="createNewFolder" class="absolute right-2 top-1.5 w-4 h-4 text-zinc-400 cursor-pointer hover:text-blue-500 transition-colors" />
+                </div>
+              </div>
+            </div>
+          </Transition>
+        </div>
+
       </nav>
 
       <div class="mt-auto flex flex-col items-center gap-4">
@@ -297,7 +439,7 @@ onUnmounted(() => {
     <div class="w-96 flex flex-col bg-zinc-50/50 dark:bg-zinc-900/10 border-r border-zinc-200 dark:border-zinc-800/50 shrink-0 relative z-10">
       <div class="p-6 pb-4">
         <div class="flex justify-between items-center mb-4">
-           <h2 class="text-2xl font-bold tracking-tight">收件箱</h2>
+           <h2 class="text-2xl font-bold tracking-tight">{{ currentMailbox === 'INBOX' ? '收件箱' : currentMailbox }}</h2>
            <button @click="fetchEmails" :class="{ 'animate-spin': isLoading }" class="p-2 rounded-xl hover:bg-white dark:hover:bg-zinc-800 shadow-sm border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 transition-all">
              <RefreshCw class="w-5 h-5 text-zinc-500" />
            </button>
@@ -455,7 +597,7 @@ onUnmounted(() => {
       <Transition name="zoom">
         <div 
           v-if="contextMenu.show" 
-          class="fixed z-[100] w-52 glass border border-zinc-200/50 dark:border-zinc-700/50 rounded-[20px] shadow-[0_20px_40px_rgba(0,0,0,0.15)] p-[5px] origin-top-left overflow-hidden"
+          class="fixed z-[100] w-52 glass border border-zinc-200/50 dark:border-zinc-700/50 rounded-[20px] shadow-[0_20px_40px_rgba(0,0,0,0.15)] p-[5px] origin-top-left overflow-visible"
           :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
           @click.stop
         >
@@ -472,10 +614,33 @@ onUnmounted(() => {
               <span>{{ contextMenu.email?.isStarred ? '取消星标' : '星标邮件' }}</span>
             </button>
             
-            <button class="w-full h-9 px-3.5 flex items-center gap-3 text-[13px] font-medium transition-all duration-200 rounded-[10px] group hover:bg-blue-600 hover:text-white text-zinc-700 dark:text-zinc-300">
-              <FolderInput class="w-4 h-4 text-emerald-500 group-hover:text-emerald-100 transition-colors" />
-              <span>移动到...</span>
-            </button>
+            <!-- Move To Item with Folder Sub-menu -->
+            <div class="relative group/folder" @mouseenter="contextMenu.showFolders = true" @mouseleave="contextMenu.showFolders = false">
+              <button class="w-full h-9 px-3.5 flex items-center justify-between text-[13px] font-medium transition-all duration-200 rounded-[10px] group hover:bg-blue-600 hover:text-white text-zinc-700 dark:text-zinc-300">
+                <div class="flex items-center gap-3">
+                  <FolderInput class="w-4 h-4 text-emerald-500 group-hover:text-emerald-100 transition-colors" />
+                  <span>移动到</span>
+                </div>
+                <ChevronRight class="w-3.5 h-3.5 text-zinc-400 group-hover:text-blue-100" />
+              </button>
+
+              <!-- Folder Sub-menu -->
+              <div 
+                v-if="contextMenu.showFolders && folders.length > 0" 
+                class="absolute left-full top-0 ml-1 w-48 glass border border-zinc-200/50 dark:border-zinc-700/50 rounded-[18px] shadow-xl p-[5px] flex flex-col gap-[2px] animate-in slide-in-from-left-2 duration-200"
+              >
+                <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                  <button 
+                    v-for="folder in folders" 
+                    :key="folder"
+                    @click="handleMoveEmail(folder)"
+                    class="w-full h-8 px-3 flex items-center gap-2 text-[12px] font-medium transition-all rounded-[8px] hover:bg-blue-600 hover:text-white text-zinc-600 dark:text-zinc-400"
+                  >
+                    <span class="truncate">{{ folder }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
             
             <div class="h-px bg-zinc-200/50 dark:bg-zinc-700/50 mx-2 my-1"></div>
             
