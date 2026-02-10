@@ -11,7 +11,7 @@ export interface EmailMessage {
     subject: string;
     from: string;
     date: Date;
-    seen: boolean;
+    isRead: boolean;
     snippet: string;
     hasAttachments: boolean;
     html?: string;

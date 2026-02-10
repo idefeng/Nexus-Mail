@@ -1,16 +1,61 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
-import { Inbox, Send, Sun, Moon, Search, Plus, RefreshCw, Reply, BrainCircuit, Sparkles, CheckCircle2, Settings, Paperclip } from 'lucide-vue-next'
+import { Inbox, Send, Sun, Moon, Search, Plus, RefreshCw, Reply, BrainCircuit, Sparkles, CheckCircle2, Settings, Paperclip, CircleDashed, Star, FolderInput, Trash2 } from 'lucide-vue-next'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import DOMPurify from 'dompurify'
 import AccountModal from '../components/AccountModal.vue'
 import AISettingsModal from '../components/AISettingsModal.vue'
+
+// Context Menu State
+const contextMenu = ref({
+  show: false,
+  x: 0,
+  y: 0,
+  email: null as EmailMessage | null
+})
+
+const handleContextMenu = (e: MouseEvent, email: EmailMessage) => {
+  e.preventDefault()
+  const menuWidth = 208
+  const menuHeight = 260
+  
+  let x = e.clientX
+  let y = e.clientY
+  
+  // Boundary checks
+  if (x + menuWidth > window.innerWidth) x -= menuWidth
+  if (y + menuHeight > window.innerHeight) y -= menuHeight
+  
+  contextMenu.value = {
+    show: true,
+    x,
+    y,
+    email
+  }
+}
+
+const closeContextMenu = () => {
+  contextMenu.value.show = false
+}
+
+const handleKeyDown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') closeContextMenu()
+}
+
+const toggleUnread = () => {
+  if (contextMenu.value.email) {
+    // Force reactivity by re-setting the property if needed, 
+    // but Vue 3 ref should handle this.
+    contextMenu.value.email.isRead = !contextMenu.value.email.isRead
+  }
+  closeContextMenu()
+}
 
 interface EmailMessage {
   id: string
   subject: string
   from: string
   date: string
-  seen: boolean
+  isRead: boolean
   snippet: string
   hasAttachments: boolean
   html?: string
@@ -29,6 +74,7 @@ const isAISettingsOpen = ref(false)
 const isConnecting = ref(false)
 const isLoading = ref(false)
 const emails = ref<EmailMessage[]>([])
+const unreadCount = computed(() => emails.value.filter(e => !e.isRead).length)
 const selectedEmail = ref<EmailMessage | null>(null)
 
 // AI Logic
@@ -159,11 +205,14 @@ const sanitize = (content: string) => {
 const selectEmail = (email: EmailMessage) => {
     selectedEmail.value = email;
     isReplying.value = false;
-    // Mark as seen locally for immediate feedback
-    email.seen = true;
+    // Mark as read locally for immediate feedback
+    email.isRead = true;
 }
 
 onMounted(async () => {
+  window.addEventListener('click', closeContextMenu)
+  window.addEventListener('keydown', handleKeyDown)
+  
   const savedAccount = await window.configAPI.getAccount()
   if (savedAccount) {
     console.log('[Main] Found saved account, auto-logging in...')
@@ -174,6 +223,11 @@ onMounted(async () => {
   if (savedAI) {
     aiConfig.value = savedAI
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('click', closeContextMenu)
+  window.removeEventListener('keydown', handleKeyDown)
 })
 </script>
 
@@ -205,8 +259,15 @@ onMounted(async () => {
           <Plus class="w-6 h-6 transition-transform group-hover:rotate-90" />
         </button>
       
-        <button class="w-12 h-12 rounded-2xl bg-blue-600 shadow-lg shadow-blue-500/20 flex flex-col items-center justify-center transition-all text-white" title="收件箱">
+        <button class="w-12 h-12 rounded-2xl bg-blue-600 shadow-lg shadow-blue-500/20 flex flex-col items-center justify-center transition-all text-white relative" title="收件箱">
           <Inbox class="w-6 h-6" />
+          <!-- Unread Badge -->
+          <span v-if="unreadCount > 0" 
+            :key="unreadCount"
+            class="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-white dark:border-zinc-900 flex items-center justify-center animate-bounce-subtle shadow-sm"
+          >
+            {{ unreadCount }}
+          </span>
         </button>
         <button class="w-12 h-12 rounded-2xl hover:bg-white/80 dark:hover:bg-zinc-800/80 flex flex-col items-center justify-center transition-all text-zinc-500" title="已发送">
           <Send class="w-6 h-6" />
@@ -247,15 +308,19 @@ onMounted(async () => {
             v-for="email in emails" 
             :key="email.id" 
             @click="selectEmail(email)"
+            @contextmenu.prevent="handleContextMenu($event, email)"
             class="mb-2 p-4 rounded-xl cursor-pointer transition-all duration-300 relative overflow-hidden group border border-transparent animate-slide-up"
             :class="selectedEmail?.id === email.id ? 'bg-white dark:bg-zinc-800 shadow-md border-zinc-200 dark:border-zinc-700' : 'hover:bg-white/60 dark:hover:bg-zinc-800/40'"
          >
-            <!-- Unread Marker (Blue Bar) -->
-            <div v-if="!email.seen" class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-3/5 bg-blue-600 rounded-r-full shadow-[0_0_8px_rgba(0,122,255,0.6)] z-10"></div>
+            <!-- Unread Marker (Blue Bar) with fade transition & breathing pulse -->
+            <div 
+              class="absolute left-0 top-1/2 -translate-y-1/2 w-[3.5px] h-3/5 bg-blue-600 rounded-r-full shadow-[0_0_12px_rgba(0,122,255,0.8)] z-10 transition-all duration-300"
+              :class="email.isRead ? 'opacity-0 -translate-x-full' : 'opacity-100 animate-pulse-slow'"
+            ></div>
             
             <!-- Line 1: From & Date -->
             <div class="flex justify-between items-center mb-1 relative z-0">
-              <span class="text-sm font-bold truncate flex-1 pr-2" :class="email.seen ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'">
+              <span class="text-sm truncate flex-1 pr-2 transition-all duration-300" :class="email.isRead ? 'text-zinc-400 dark:text-zinc-500 font-normal' : 'text-zinc-900 dark:text-zinc-100 font-bold'">
                 {{ email.from }}
               </span>
               <div class="flex items-center gap-1.5 shrink-0">
@@ -265,12 +330,12 @@ onMounted(async () => {
             </div>
 
             <!-- Line 2: Subject -->
-            <h3 class="text-sm mb-1 truncate leading-snug tracking-tight" :class="email.seen ? 'text-zinc-600 dark:text-zinc-400 font-medium' : 'text-zinc-900 dark:text-zinc-100 font-bold'">
+            <h3 class="text-sm mb-1 truncate leading-snug tracking-tight transition-all duration-300" :class="email.isRead ? 'text-zinc-500 dark:text-zinc-400 font-normal' : 'text-zinc-900 dark:text-zinc-100 font-bold'">
               {{ email.subject }}
             </h3>
 
             <!-- Line 3: Snippet -->
-            <p class="text-xs line-clamp-1 opacity-60 leading-relaxed font-medium" :class="email.seen ? 'text-zinc-400' : 'text-zinc-500 dark:text-zinc-400'">
+            <p class="text-xs line-clamp-1 opacity-60 leading-relaxed font-medium transition-all duration-300" :class="email.isRead ? 'text-zinc-400' : 'text-zinc-500 dark:text-zinc-400'">
               {{ email.snippet }}
             </p>
          </div>
@@ -375,6 +440,44 @@ onMounted(async () => {
         <p class="text-sm font-medium">选择一封邮件以查看智能摘要与详情</p>
       </div>
     </main>
+
+    <!-- Context Menu -->
+    <Teleport to="body">
+      <Transition name="zoom">
+        <div 
+          v-if="contextMenu.show" 
+          class="fixed z-[100] w-52 glass border border-zinc-200/50 dark:border-zinc-700/50 rounded-[20px] shadow-[0_20px_40px_rgba(0,0,0,0.15)] p-[5px] origin-top-left overflow-hidden"
+          :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+          @click.stop
+        >
+          <div class="flex flex-col gap-[2px]">
+            <button @click="toggleUnread" class="w-full h-9 px-3.5 flex items-center gap-3 text-[13px] font-medium transition-all duration-200 rounded-[10px] group hover:bg-blue-600 hover:text-white text-zinc-700 dark:text-zinc-300">
+              <CircleDashed class="w-4 h-4 text-blue-500 group-hover:text-blue-100 transition-colors" />
+              <span>{{ contextMenu.email?.isRead ? '标记为未读' : '标记为已读' }}</span>
+            </button>
+            
+            <div class="h-px bg-zinc-200/50 dark:bg-zinc-700/50 mx-2 my-1"></div>
+            
+            <button class="w-full h-9 px-3.5 flex items-center gap-3 text-[13px] font-medium transition-all duration-200 rounded-[10px] group hover:bg-blue-600 hover:text-white text-zinc-700 dark:text-zinc-300">
+              <Star class="w-4 h-4 text-amber-500 group-hover:text-amber-100 transition-colors" />
+              <span>星标邮件</span>
+            </button>
+            
+            <button class="w-full h-9 px-3.5 flex items-center gap-3 text-[13px] font-medium transition-all duration-200 rounded-[10px] group hover:bg-blue-600 hover:text-white text-zinc-700 dark:text-zinc-300">
+              <FolderInput class="w-4 h-4 text-emerald-500 group-hover:text-emerald-100 transition-colors" />
+              <span>移动到...</span>
+            </button>
+            
+            <div class="h-px bg-zinc-200/50 dark:bg-zinc-700/50 mx-2 my-1"></div>
+            
+            <button class="w-full h-9 px-3.5 flex items-center gap-3 text-[13px] font-medium transition-all duration-200 rounded-[10px] group hover:bg-red-600 hover:text-white text-red-500/80">
+              <Trash2 class="w-4 h-4 transition-colors" />
+              <span>删除</span>
+            </button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -408,5 +511,42 @@ onMounted(async () => {
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Zoom Transition for Context Menu */
+.zoom-enter-active,
+.zoom-leave-active {
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.zoom-enter-from,
+.zoom-leave-to {
+  opacity: 0;
+  transform: scale(0.9) translateY(-10px);
+}
+
+/* New Animations */
+@keyframes bounce-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.animate-bounce-subtle {
+  animation: bounce-subtle 0.4s ease-out;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { 
+    opacity: 1; 
+    filter: brightness(1);
+    box-shadow: 0 0 12px rgba(0, 122, 255, 0.8);
+  }
+  50% { 
+    opacity: 0.6; 
+    filter: brightness(1.4);
+    box-shadow: 0 0 20px rgba(0, 122, 255, 1);
+  }
+}
+.animate-pulse-slow {
+  animation: pulse-slow 3s infinite ease-in-out;
 }
 </style>

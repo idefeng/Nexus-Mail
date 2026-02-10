@@ -15,7 +15,7 @@ export interface EmailMessage {
     subject: string;
     from: string;
     date: Date;
-    seen: boolean;
+    isRead: boolean;
     snippet: string;
     hasAttachments: boolean;
     html?: string;
@@ -105,7 +105,7 @@ export class EmailService {
                         subject: parsed.subject || '(无主题)',
                         from: parsed.from?.text || '未知',
                         date: parsed.date || new Date(),
-                        seen: msg.attributes.flags.includes('\\Seen'),
+                        isRead: msg.attributes.flags.includes('\\Seen'),
                         snippet: (parsed.text?.substring(0, 100) || '').replace(/\s+/g, ' '),
                         hasAttachments: (parsed.attachments && parsed.attachments.length > 0) || false,
                         html: parsed.html || undefined,
