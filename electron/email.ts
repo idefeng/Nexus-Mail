@@ -65,14 +65,12 @@ export class EmailService {
         console.log(`[IMAP] Fetching emails (Range Optimized), limit: ${limit}`);
 
         try {
-            // Access the underlying node-imap box info
-            const box: any = (this.connection as any).imap._box;
-            if (!box) {
-                console.error('[IMAP] Box info not found. Re-opening INBOX...');
-                await this.connection.openBox('INBOX');
-            }
+            // Force re-opening the box to sync with server status
+            // This ensures we get the latest message count (total)
+            console.log('[IMAP] Re-syncing INBOX...');
+            const box: any = await this.connection.openBox('INBOX');
 
-            const totalMessages = (this.connection as any).imap._box.messages.total;
+            const totalMessages = box.messages.total;
             console.log(`[IMAP] Total messages in INBOX: ${totalMessages}`);
 
             if (totalMessages === 0) return [];

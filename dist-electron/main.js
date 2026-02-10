@@ -46,11 +46,8 @@ var EmailService = class {
 		if (!this.connection) throw new Error("Not connected");
 		console.log(`[IMAP] Fetching emails (Range Optimized), limit: ${limit}`);
 		try {
-			if (!this.connection.imap._box) {
-				console.error("[IMAP] Box info not found. Re-opening INBOX...");
-				await this.connection.openBox("INBOX");
-			}
-			const totalMessages = this.connection.imap._box.messages.total;
+			console.log("[IMAP] Re-syncing INBOX...");
+			const totalMessages = (await this.connection.openBox("INBOX")).messages.total;
 			console.log(`[IMAP] Total messages in INBOX: ${totalMessages}`);
 			if (totalMessages === 0) return [];
 			const range = `${Math.max(1, totalMessages - limit + 1)}:${totalMessages}`;
