@@ -11,7 +11,7 @@ export interface EmailMessage {
     id: string;
     subject: string;
     from: string;
-    date: Date;
+    date: string;
     isRead: boolean;
     isStarred: boolean;
     snippet: string;

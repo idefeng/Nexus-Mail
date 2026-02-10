@@ -87,18 +87,7 @@ const handleMoveEmail = async (folder: string) => {
   closeContextMenu()
 }
 
-interface EmailMessage {
-  id: string
-  subject: string
-  from: string
-  date: string
-  isRead: boolean
-  isStarred: boolean
-  snippet: string
-  hasAttachments: boolean
-  html?: string
-  text?: string
-}
+
 
 interface AISummary {
   summary: string
@@ -180,11 +169,6 @@ const createNewFolder = async () => {
 const aiConfig = ref<any>({ enabled: true })
 const summaryData = ref<AISummary | null>(null)
 const isSummarizing = ref(false)
-
-// Reply Logic
-const isReplying = ref(false)
-const replyContent = ref('')
-const isSending = ref(false)
 
 const toggleTheme = () => {
   isDarkMode.value = !isDarkMode.value
@@ -338,36 +322,12 @@ const handleReply = () => {
   openCompose(selectedEmail.value)
 }
 
-const handleSend = async () => {
-  if (!selectedEmail.value || !replyContent.value) return
-  
-  isSending.value = true
-  try {
-    const success = await window.emailAPI.send(
-      selectedEmail.value.from,
-      `Re: ${selectedEmail.value.subject}`,
-      replyContent.value
-    )
-    if (success) {
-      alert('发送成功')
-      isReplying.value = false
-      replyContent.value = ''
-    }
-  } catch (error) {
-    console.error('Send failed:', error)
-    alert('发送失败')
-  } finally {
-    isSending.value = false
-  }
-}
-
 const sanitize = (content: string) => {
   return DOMPurify.sanitize(content)
 }
 
 const selectEmail = (email: EmailMessage) => {
     selectedEmail.value = email;
-    isReplying.value = false;
     // Mark as read locally for immediate feedback
     email.isRead = true;
 }
