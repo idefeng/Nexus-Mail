@@ -44,7 +44,7 @@
   },
   "build": {
     "appId": "com.nexus-mail.app",
-    "productName": "灵境邮",
+    "productName": "灵镜邮",
     "directories": {
       "output": "dist_electron"
     },

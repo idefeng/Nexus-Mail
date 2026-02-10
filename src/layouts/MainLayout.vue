@@ -31,6 +31,7 @@ const emails = ref<EmailMessage[]>([])
 const selectedEmail = ref<EmailMessage | null>(null)
 
 // AI Logic
+const aiConfig = ref<any>({ enabled: true })
 const summaryData = ref<AISummary | null>(null)
 const isSummarizing = ref(false)
 
@@ -76,9 +77,12 @@ const handleLogin = async (config: any) => {
 }
 
 const handleAISave = async (config: any) => {
+  aiConfig.value = config
   await window.aiAPI.setConfig(config)
-  if (selectedEmail.value) {
+  if (selectedEmail.value && aiConfig.value.enabled) {
     summarizeEmail(selectedEmail.value)
+  } else if (!aiConfig.value.enabled) {
+    summaryData.value = null
   }
 }
 
@@ -97,6 +101,7 @@ const fetchEmails = async () => {
 }
 
 const summarizeEmail = async (email: EmailMessage) => {
+  if (!aiConfig.value.enabled) return
   isSummarizing.value = true
   summaryData.value = null
   try {
@@ -111,7 +116,7 @@ const summarizeEmail = async (email: EmailMessage) => {
 }
 
 watch(selectedEmail, (newEmail) => {
-  if (newEmail) {
+  if (newEmail && aiConfig.value.enabled) {
     summarizeEmail(newEmail)
   } else {
     summaryData.value = null
@@ -162,6 +167,11 @@ onMounted(async () => {
   if (savedAccount) {
     console.log('[Main] Found saved account, auto-logging in...')
     await handleLogin(savedAccount)
+  }
+
+  const savedAI = await window.configAPI.getAI()
+  if (savedAI) {
+    aiConfig.value = savedAI
   }
 })
 </script>
@@ -263,7 +273,7 @@ onMounted(async () => {
         <header class="h-16 shrink-0 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-6 justify-between bg-zinc-50/50 dark:bg-zinc-950/20">
             <div class="flex items-center gap-3 overflow-hidden">
                 <h1 class="text-lg font-bold truncate max-w-xl" :title="selectedEmail.subject">{{ selectedEmail.subject }}</h1>
-                <span v-if="summaryData?.category" class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                <span v-if="aiConfig.enabled && summaryData?.category" class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                     {{ summaryData.category }}
                 </span>
             </div>
@@ -277,12 +287,12 @@ onMounted(async () => {
         </header>
 
         <!-- Summary Section -->
-        <div class="px-8 pt-6 pb-2 shrink-0">
+        <div v-if="aiConfig.enabled" class="px-8 pt-6 pb-2 shrink-0">
             <div class="bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2 text-blue-600 dark:text-blue-400">
                         <BrainCircuit class="w-5 h-5" />
-                        <h2 class="text-sm font-bold tracking-tight">灵境摘要</h2>
+                        <h2 class="text-sm font-bold tracking-tight">灵镜摘要</h2>
                     </div>
                     <div v-if="isSummarizing" class="flex items-center gap-2 text-xs text-zinc-400">
                         <Sparkles class="w-3 h-3 animate-pulse" />

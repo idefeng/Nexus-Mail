@@ -12,7 +12,7 @@ export class AIService {
     async summarize(content: string): Promise<AISummary> {
         if (!this.apiKey) {
             return {
-                summary: '请在设置中配置 AI API Key 以启用灵境摘要。',
+                summary: '请在设置中配置 AI API Key 以启用灵镜摘要。',
                 actions: ['配置 API Key', '选择 AI 模型', '开始智能摘要'],
                 category: '系统'
             };

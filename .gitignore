@@ -1,41 +1,54 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-pnpm-debug.log*
-lerna-debug.log*
+# Dependencies
+node_modules/
 
-node_modules
-dist
-dist-ssr
-dist-electron
-dist_electron
-release
-*.local
+# Build outputs
+dist/
+dist-ssr/
+dist-electron/
+dist_electron/
+build/
+out/
+release/
+app-update.yml
+__snapshots__
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Electron / Build artifacts
+# Binaries & Installers
 *.exe
 *.zip
 *.dmg
 *.AppImage
 *.deb
 *.rpm
-out/
-app-update.yml
-__snapshots__
-	
-# Config
-config.json
+*.tar.gz
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment & Config
 .env
+.env.local
+.env.*.local
+*.local
+config.json
+
+# IDE / Editor
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

@@ -14,7 +14,8 @@ const emit = defineEmits<{
 const form = ref({
   baseURL: 'https://api.deepseek.com/v1',
   apiKey: '',
-  model: 'deepseek-chat'
+  model: 'deepseek-chat',
+  enabled: true
 })
 
 watch(() => props.isOpen, async (newVal) => {
@@ -38,7 +39,7 @@ const handleSave = () => {
       <div class="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-950/40">
         <div class="flex items-center gap-2 text-zinc-800 dark:text-zinc-200">
           <Settings class="w-5 h-5" />
-          <h2 class="text-lg font-bold">灵境摘要设置</h2>
+          <h2 class="text-lg font-bold">灵镜摘要设置</h2>
         </div>
         <button @click="emit('close')" class="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors">
           <X class="w-5 h-5" />
@@ -60,6 +61,14 @@ const handleSave = () => {
         <div>
           <label class="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">模型名称 (Model)</label>
           <input v-model="form.model" type="text" class="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-shadow" placeholder="gpt-4o" />
+        </div>
+
+        <div class="flex items-center justify-between p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30">
+          <span class="text-sm font-bold text-zinc-700 dark:text-zinc-300">启用灵镜摘要</span>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" v-model="form.enabled" class="sr-only peer">
+            <div class="w-11 h-6 bg-zinc-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-zinc-600 peer-checked:bg-blue-600"></div>
+          </label>
         </div>
       </div>
 
