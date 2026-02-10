@@ -50,12 +50,20 @@ const toggleUnread = () => {
   closeContextMenu()
 }
 
+const toggleStarred = () => {
+  if (contextMenu.value.email) {
+    contextMenu.value.email.isStarred = !contextMenu.value.email.isStarred
+  }
+  closeContextMenu()
+}
+
 interface EmailMessage {
   id: string
   subject: string
   from: string
   date: string
   isRead: boolean
+  isStarred: boolean
   snippet: string
   hasAttachments: boolean
   html?: string
@@ -324,6 +332,7 @@ onUnmounted(() => {
                 {{ email.from }}
               </span>
               <div class="flex items-center gap-1.5 shrink-0">
+                <Star v-if="email.isStarred" class="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                 <Paperclip v-if="email.hasAttachments" class="w-3 h-3 text-zinc-400" />
                 <span class="text-[10px] text-zinc-400 font-medium tracking-tight">{{ formatDate(email.date) }}</span>
               </div>
@@ -458,9 +467,9 @@ onUnmounted(() => {
             
             <div class="h-px bg-zinc-200/50 dark:bg-zinc-700/50 mx-2 my-1"></div>
             
-            <button class="w-full h-9 px-3.5 flex items-center gap-3 text-[13px] font-medium transition-all duration-200 rounded-[10px] group hover:bg-blue-600 hover:text-white text-zinc-700 dark:text-zinc-300">
-              <Star class="w-4 h-4 text-amber-500 group-hover:text-amber-100 transition-colors" />
-              <span>星标邮件</span>
+            <button @click="toggleStarred" class="w-full h-9 px-3.5 flex items-center gap-3 text-[13px] font-medium transition-all duration-200 rounded-[10px] group hover:bg-blue-600 hover:text-white text-zinc-700 dark:text-zinc-300">
+              <Star class="w-4 h-4 transition-colors" :class="contextMenu.email?.isStarred ? 'text-amber-500 fill-amber-500 group-hover:text-amber-100 group-hover:fill-amber-100' : 'text-amber-500 group-hover:text-amber-100'" />
+              <span>{{ contextMenu.email?.isStarred ? '取消星标' : '星标邮件' }}</span>
             </button>
             
             <button class="w-full h-9 px-3.5 flex items-center gap-3 text-[13px] font-medium transition-all duration-200 rounded-[10px] group hover:bg-blue-600 hover:text-white text-zinc-700 dark:text-zinc-300">

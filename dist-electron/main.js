@@ -69,6 +69,7 @@ var EmailService = class {
 						from: parsed.from?.text || "未知",
 						date: parsed.date || /* @__PURE__ */ new Date(),
 						isRead: msg.attributes.flags.includes("\\Seen"),
+						isStarred: msg.attributes.flags.includes("\\Flagged"),
 						snippet: (parsed.text?.substring(0, 100) || "").replace(/\s+/g, " "),
 						hasAttachments: parsed.attachments && parsed.attachments.length > 0 || false,
 						html: parsed.html || void 0,

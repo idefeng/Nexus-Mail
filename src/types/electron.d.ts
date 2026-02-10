@@ -12,6 +12,7 @@ export interface EmailMessage {
     from: string;
     date: Date;
     isRead: boolean;
+    isStarred: boolean;
     snippet: string;
     hasAttachments: boolean;
     html?: string;
