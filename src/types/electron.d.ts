@@ -4,6 +4,7 @@ export interface EmailConfig {
     host: string;
     port: number;
     tls?: boolean;
+    avatar?: string;
 }
 
 export interface EmailMessage {
