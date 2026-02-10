@@ -1,6 +1,13 @@
-import imaps from 'imap-simple';
-import { simpleParser } from 'mailparser';
-import nodemailer from 'nodemailer';
+import { createRequire } from 'node:module';
+import type * as ImapSimple from 'imap-simple';
+
+const require = createRequire(import.meta.url);
+const imapsRaw = require('imap-simple');
+// Handle potential default export wrapper
+const imaps = imapsRaw.default || imapsRaw;
+const mailparser = require('mailparser');
+const nodemailer = require('nodemailer');
+const { simpleParser } = mailparser;
 
 export interface EmailConfig {
     user: string;
@@ -25,11 +32,11 @@ export interface EmailMessage {
 
 export class EmailService {
     private config: EmailConfig | null = null;
-    private connection: imaps.ImapSimple | null = null;
+    private connection: ImapSimple.ImapSimple | null = null;
 
     async connect(config: EmailConfig) {
         this.config = config;
-        const imapConfig: imaps.ImapSimpleOptions = {
+        const imapConfig: ImapSimple.ImapSimpleOptions = {
             imap: {
                 user: config.user,
                 password: config.pass,
@@ -43,16 +50,17 @@ export class EmailService {
 
         console.log('[IMAP] Connecting with config:', { ...imapConfig.imap, password: '***' });
         try {
-            this.connection = await imaps.connect(imapConfig);
+            const connection = await imaps.connect(imapConfig);
+            this.connection = connection;
             console.log('[IMAP] Connected successfully');
 
-            this.connection.on('error', (err: any) => {
+            connection.on('error', (err: any) => {
                 console.error('[IMAP] Connection Error Event:', err);
                 this.connection = null;
             });
 
             console.log('[IMAP] Opening INBOX...');
-            await this.connection.openBox('INBOX');
+            await connection.openBox('INBOX');
             console.log('[IMAP] INBOX opened');
             return true;
         } catch (error) {

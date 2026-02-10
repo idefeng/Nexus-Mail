@@ -4,6 +4,7 @@ import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import DOMPurify from 'dompurify'
 import AccountModal from '../components/AccountModal.vue'
 import AISettingsModal from '../components/AISettingsModal.vue'
+import ComposeDrawer from '../components/ComposeDrawer.vue'
 
 // Context Menu State
 const contextMenu = ref({
@@ -111,8 +112,29 @@ const isAISettingsOpen = ref(false)
 const isConnecting = ref(false)
 const isLoading = ref(false)
 const isSyncing = ref(false)
+const isComposeOpen = ref(false)
+const composeContext = ref<EmailMessage | null>(null)
 const consecutiveFailures = ref(0)
 const currentMailbox = ref('INBOX')
+
+const openCompose = (context: EmailMessage | null = null) => {
+  composeContext.value = context
+  isComposeOpen.value = true
+}
+
+const handleComposeSend = async (data: { to: string, subject: string, body: string }) => {
+  try {
+    const success = await window.emailAPI.send(data.to, data.subject, data.body)
+    if (success) {
+      alert('已成功发送邮件')
+      isComposeOpen.value = false
+      composeContext.value = null
+    }
+  } catch (error) {
+    console.error('Compose send failed:', error)
+    alert('发送失败，请检查连接')
+  }
+}
 const showFoldersSidebar = ref(false)
 const emails = ref<EmailMessage[]>([])
 const unreadCount = computed(() => emails.value.filter(e => !e.isRead).length)
@@ -305,8 +327,8 @@ watch(selectedEmail, (newEmail) => {
 })
 
 const handleReply = () => {
-  isReplying.value = true
-  replyContent.value = ''
+  if (!selectedEmail.value) return
+  openCompose(selectedEmail.value)
 }
 
 const handleSend = async () => {
@@ -433,18 +455,24 @@ onUnmounted(() => {
       @close="isAISettingsOpen = false"
       @save="handleAISave"
     />
+    <ComposeDrawer 
+      :is-open="isComposeOpen"
+      :original-email="composeContext"
+      @close="isComposeOpen = false; composeContext = null"
+      @send="handleComposeSend"
+    />
 
     <!-- Sidebar -->
     <aside class="w-20 flex flex-col items-center py-6 glass border-r border-zinc-200 dark:border-zinc-800/50 shrink-0 z-20">
       <div class="mb-8 p-1">
-        <div class="w-12 h-12 rounded-2xl bg-white dark:bg-zinc-800 flex items-center justify-center cursor-pointer overflow-hidden border border-zinc-200 dark:border-zinc-700 shadow-sm transition-all hover:scale-105 active:scale-95" @click="isAccountModalOpen = true" title="添加账户">
+        <div class="w-12 h-12 rounded-2xl bg-white dark:bg-zinc-800 flex items-center justify-center cursor-pointer overflow-hidden border border-zinc-200 dark:border-zinc-700 shadow-sm transition-all hover:scale-105 active:scale-95" @click="isAccountModalOpen = true" title="账户设置">
           <img v-if="!emails.length" src="/logo.png" alt="NM" class="w-full h-full object-cover" />
           <span v-else class="text-white font-bold bg-blue-600 w-full h-full flex items-center justify-center">Me</span>
         </div>
       </div>
       
       <nav class="flex-1 flex flex-col gap-6 relative">
-        <button @click="isAccountModalOpen = true" class="w-12 h-12 rounded-2xl hover:bg-white/80 dark:hover:bg-zinc-800/80 flex flex-col items-center justify-center transition-all text-blue-600 group" title="添加账户">
+        <button @click="openCompose()" class="w-12 h-12 rounded-2xl bg-blue-600 shadow-lg shadow-blue-500/20 flex flex-col items-center justify-center transition-all text-white group hover:scale-110 active:scale-95" title="新建邮件">
           <Plus class="w-6 h-6 transition-transform group-hover:rotate-90" />
         </button>
       
@@ -676,23 +704,7 @@ onUnmounted(() => {
             </div>
         </div>
 
-        <div v-if="isReplying" class="border-b border-zinc-200 dark:border-zinc-800 p-6 bg-blue-50/10 dark:bg-blue-900/5">
-            <div class="mb-4">
-                <span class="text-xs font-semibold uppercase text-zinc-400 tracking-wider">回复给: </span>
-                <span class="text-sm font-medium">{{ selectedEmail.from }}</span>
-            </div>
-            <textarea 
-                v-model="replyContent" 
-                class="w-full h-40 p-3 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-sm" 
-                placeholder="撰写回复..."
-            ></textarea>
-            <div class="flex justify-end gap-3 mt-4">
-                <button @click="isReplying = false" class="px-4 py-2 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors">取消</button>
-                <button @click="handleSend" :disabled="isSending || !replyContent" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold rounded-md transition-all shadow-md">
-                    {{ isSending ? '正在发送...' : '发送' }}
-                </button>
-            </div>
-        </div>
+
 
         <div class="flex-1 p-8 overflow-y-auto custom-scrollbar">
             <div class="flex items-center gap-4 mb-8">

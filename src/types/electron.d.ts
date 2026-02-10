@@ -31,6 +31,9 @@ export interface IEmailAPI {
 
 export interface IAIAPI {
     summarize: (content: string) => Promise<{ summary: string; actions: string[]; category: string }>;
+    improve: (text: string, tone: string) => Promise<string>;
+    generateOutlines: (context: string) => Promise<string[]>;
+    chat: (prompt: string) => Promise<string>;
     setConfig: (config: { baseURL?: string; apiKey?: string; model?: string }) => Promise<void>;
 }
 
@@ -39,11 +42,23 @@ export interface IConfigAPI {
     getAI: () => Promise<any | null>;
 }
 
+export interface IDraftAPI {
+    save: (draft: any) => Promise<boolean>;
+    get: (id?: string) => Promise<any | null>;
+}
+
+export interface IContactAPI {
+    search: (query: string) => Promise<any[]>;
+    add: (contact: any) => Promise<void>;
+}
+
 declare global {
     interface Window {
         ipcRenderer: import('electron').IpcRenderer;
         emailAPI: IEmailAPI;
         aiAPI: IAIAPI;
         configAPI: IConfigAPI;
+        draftAPI: IDraftAPI;
+        contactAPI: IContactAPI;
     }
 }

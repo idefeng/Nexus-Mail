@@ -24,20 +24,34 @@ export default defineConfig({
                 'net',
                 'fs',
                 'path',
+                'crypto',
+                'node:fs',
+                'node:path',
+                'node:crypto',
+                'node:url',
+                'node:path',
+                'node:os',
                 'util',
                 'stream',
                 'events',
                 'buffer',
-                'crypto'
               ],
             },
           },
         },
       },
       preload: {
-        // Shortcut of `build.rollupOptions.input`.
-        // Preload scripts may contain Web assets, so use the `build.rollupOptions.input` instead `build.lib.entry`.
         input: 'electron/preload.ts',
+        vite: {
+          build: {
+            outDir: 'dist-electron',
+            rollupOptions: {
+              output: {
+                entryFileNames: 'preload.js', // Force correct filename
+              },
+            },
+          },
+        },
       },
     }),
   ],
