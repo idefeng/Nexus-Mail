@@ -387,6 +387,14 @@ app.whenReady().then(() => {
 			throw error;
 		}
 	});
+	ipcMain.handle("email:syncNew", async (_, lastUid, mailbox) => {
+		try {
+			return await emailService.syncNewEmails(lastUid, mailbox);
+		} catch (error) {
+			console.error("[IPC] email:syncNew error:", error);
+			throw error;
+		}
+	});
 	ipcMain.handle("email:send", async (_, to, subject, body) => {
 		return await emailService.sendEmail(to, subject, body);
 	});

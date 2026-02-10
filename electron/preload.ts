@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 contextBridge.exposeInMainWorld('emailAPI', {
     connect: (config: any) => ipcRenderer.invoke('email:connect', config),
     fetch: (limit: number, mailbox?: string) => ipcRenderer.invoke('email:fetch', limit, mailbox),
+    syncNew: (lastUid: string, mailbox?: string) => ipcRenderer.invoke('email:syncNew', lastUid, mailbox),
     send: (to: string, subject: string, body: string) => ipcRenderer.invoke('email:send', to, subject, body),
     getFolders: () => ipcRenderer.invoke('email:getFolders'),
     move: (uid: string, targetFolder: string, sourceFolder?: string) => ipcRenderer.invoke('email:move', uid, targetFolder, sourceFolder),

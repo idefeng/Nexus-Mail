@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Inbox, Send, Sun, Moon, Search, Plus, RefreshCw, Reply, BrainCircuit, Sparkles, CheckCircle2, Settings, Paperclip, CircleDashed, Star, FolderInput, Trash2, ChevronRight, Folder } from 'lucide-vue-next'
+import { Inbox, Send, Sun, Moon, Search, Plus, RefreshCw, Reply, BrainCircuit, Sparkles, CheckCircle2, Settings, Paperclip, CircleDashed, Star, FolderInput, Trash2, ChevronRight, Folder, WifiOff } from 'lucide-vue-next'
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import DOMPurify from 'dompurify'
 import AccountModal from '../components/AccountModal.vue'
@@ -110,12 +110,16 @@ const isAccountModalOpen = ref(false)
 const isAISettingsOpen = ref(false)
 const isConnecting = ref(false)
 const isLoading = ref(false)
+const isSyncing = ref(false)
+const consecutiveFailures = ref(0)
 const currentMailbox = ref('INBOX')
 const showFoldersSidebar = ref(false)
 const emails = ref<EmailMessage[]>([])
 const unreadCount = computed(() => emails.value.filter(e => !e.isRead).length)
 const selectedEmail = ref<EmailMessage | null>(null)
 const newFolderName = ref('')
+
+const showSyncError = computed(() => consecutiveFailures.value >= 3)
 
 const isSentMailbox = computed(() => {
   const name = currentMailbox.value.toLowerCase()
@@ -226,6 +230,51 @@ const fetchEmails = async () => {
   }
 }
 
+const fetchNewEmails = async (isRetry = false) => {
+  // Conflict detection: Skip if manual loading or already syncing
+  if (isLoading.value || (isSyncing.value && !isRetry) || emails.value.length === 0) return
+
+  isSyncing.value = true
+  
+  // Find the highest UID (ID) in our current list
+  const lastUid = Math.max(...emails.value.map(e => parseInt(e.id))).toString()
+  
+  try {
+    const newEmails = await window.emailAPI.syncNew(lastUid, currentMailbox.value)
+    if (newEmails && newEmails.length > 0) {
+      console.log(`[Sync] Found ${newEmails.length} new emails`)
+      // Prepend brand new emails to the list
+      emails.value = [...newEmails, ...emails.value]
+
+      // Show Native Notification
+      if (Notification.permission === 'granted') {
+          const firstNew = newEmails[0]
+          const notification = new Notification('Nexus Mail - 灵境邮', {
+              body: `您有 ${newEmails.length} 封新邮件，请查收。\n主题: ${firstNew.subject}`,
+              icon: '/logo.png' // Ensure logo is accessible
+          })
+          notification.onclick = () => {
+              window.focus()
+              selectEmail(firstNew)
+          }
+      } else if (Notification.permission !== 'denied') {
+          Notification.requestPermission()
+      }
+    }
+    consecutiveFailures.value = 0 // Success, reset failures
+  } catch (error) {
+    if (!isRetry) {
+      console.warn('[Sync] Sync failed, retrying once silently...')
+      isSyncing.value = false
+      return fetchNewEmails(true)
+    }
+    consecutiveFailures.value++
+    console.error('[Sync] Background sync failed after retry:', error)
+  } finally {
+    isSyncing.value = false
+  }
+}
+
 const switchMailbox = async (mailbox: string) => {
   currentMailbox.value = mailbox
   selectedEmail.value = null
@@ -294,9 +343,59 @@ const selectEmail = (email: EmailMessage) => {
     email.isRead = true;
 }
 
+// Smart Sync Logic
+let syncTimer: any = null
+const lastActivity = ref(Date.now())
+const isIdle = ref(false)
+const IDLE_THRESHOLD = 5 * 60 * 1000 // 5 minutes
+const ACTIVE_SYNC_INTERVAL = 180 * 1000 // 3 minutes
+const IDLE_SYNC_INTERVAL = 600 * 1000 // 10 minutes
+
+const resetIdleTimer = () => {
+  lastActivity.value = Date.now()
+  if (isIdle.value) {
+    console.log('[Smart Sync] User became active, resetting to frequent sync.')
+    isIdle.value = false
+    planNextSync(0) // Sync immediately on activity return
+  }
+}
+
+const planNextSync = (delay?: number) => {
+  if (syncTimer) clearTimeout(syncTimer)
+  
+  const currentInterval = isIdle.value ? IDLE_SYNC_INTERVAL : ACTIVE_SYNC_INTERVAL
+  const nextDelay = delay !== undefined ? delay : currentInterval
+  
+  syncTimer = setTimeout(async () => {
+    // Determine if we should be idle
+    if (!isIdle.value && Date.now() - lastActivity.value > IDLE_THRESHOLD) {
+      console.log('[Smart Sync] No activity detected for 5 min, entering idle mode.')
+      isIdle.value = true
+    }
+    
+    await fetchNewEmails()
+    planNextSync() // Schedule next one
+  }, nextDelay)
+}
+
 onMounted(async () => {
   window.addEventListener('click', closeContextMenu)
   window.addEventListener('keydown', handleKeyDown)
+  
+  // Activity listeners for Smart Sync
+  window.addEventListener('mousemove', resetIdleTimer)
+  window.addEventListener('keydown', resetIdleTimer)
+  window.addEventListener('mousedown', resetIdleTimer)
+  window.addEventListener('scroll', resetIdleTimer, true)
+  
+  window.addEventListener('focus', () => {
+    console.log('[Smart Sync] Window focused, instant sync triggered.')
+    resetIdleTimer()
+    planNextSync(0)
+  })
+
+  // Start the sync cycle
+  planNextSync(ACTIVE_SYNC_INTERVAL)
   
   const savedAccount = await window.configAPI.getAccount()
   if (savedAccount) {
@@ -313,6 +412,11 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('click', closeContextMenu)
   window.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('mousemove', resetIdleTimer)
+  window.removeEventListener('keydown', resetIdleTimer)
+  window.removeEventListener('mousedown', resetIdleTimer)
+  window.removeEventListener('scroll', resetIdleTimer, true)
+  if (syncTimer) clearTimeout(syncTimer)
 })
 </script>
 
@@ -425,6 +529,13 @@ onUnmounted(() => {
       </nav>
 
       <div class="mt-auto flex flex-col items-center gap-4">
+        <!-- Connection Error Indicator -->
+        <Transition name="fade">
+          <div v-if="showSyncError" class="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500" title="连接异常，正在重试同步">
+            <WifiOff class="w-5 h-5 animate-pulse" />
+          </div>
+        </Transition>
+
         <button @click="isAISettingsOpen = true" class="w-10 h-10 rounded-xl hover:bg-white/80 dark:hover:bg-zinc-800/80 flex items-center justify-center transition-all text-zinc-400 hover:text-blue-500" title="AI 设置">
           <Settings class="w-5 h-5" />
         </button>
@@ -439,7 +550,22 @@ onUnmounted(() => {
     <div class="w-96 flex flex-col bg-zinc-50/50 dark:bg-zinc-900/10 border-r border-zinc-200 dark:border-zinc-800/50 shrink-0 relative z-10">
       <div class="p-6 pb-4">
         <div class="flex justify-between items-center mb-4">
-           <h2 class="text-2xl font-bold tracking-tight">{{ currentMailbox === 'INBOX' ? '收件箱' : currentMailbox }}</h2>
+           <div class="flex items-center gap-3">
+             <h2 class="text-2xl font-bold tracking-tight">{{ currentMailbox === 'INBOX' ? '收件箱' : currentMailbox }}</h2>
+             <!-- Nexus Heartbeat (灵境心跳) -->
+             <div class="relative w-2 h-2 mt-1.5" v-if="isSyncing || consecutiveFailures === 0">
+                <div 
+                  class="absolute inset-0 rounded-full transition-all duration-700"
+                  :class="[
+                    isSyncing ? 'bg-blue-500 scale-125' : 'bg-emerald-500/40 scale-100',
+                  ]"
+                ></div>
+                <div 
+                  v-if="isSyncing"
+                  class="absolute -inset-1.5 border border-blue-400/50 rounded-full animate-ping-slow"
+                ></div>
+             </div>
+           </div>
            <button @click="fetchEmails" :class="{ 'animate-spin': isLoading }" class="p-2 rounded-xl hover:bg-white dark:hover:bg-zinc-800 shadow-sm border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 transition-all">
              <RefreshCw class="w-5 h-5 text-zinc-500" />
            </button>

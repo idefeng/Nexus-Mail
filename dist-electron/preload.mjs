@@ -20,6 +20,7 @@ electron.contextBridge.exposeInMainWorld("ipcRenderer", {
 electron.contextBridge.exposeInMainWorld("emailAPI", {
 	connect: (config) => electron.ipcRenderer.invoke("email:connect", config),
 	fetch: (limit, mailbox) => electron.ipcRenderer.invoke("email:fetch", limit, mailbox),
+	syncNew: (lastUid, mailbox) => electron.ipcRenderer.invoke("email:syncNew", lastUid, mailbox),
 	send: (to, subject, body) => electron.ipcRenderer.invoke("email:send", to, subject, body),
 	getFolders: () => electron.ipcRenderer.invoke("email:getFolders"),
 	move: (uid, targetFolder, sourceFolder) => electron.ipcRenderer.invoke("email:move", uid, targetFolder, sourceFolder),
